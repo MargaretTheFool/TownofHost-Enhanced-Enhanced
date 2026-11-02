@@ -164,7 +164,8 @@ class RpcSetTasksPatch
             NumLongTasks = 0;
         }
 
-        if (pc.Is(CustomRoles.Workhorse))
+        bool appendWorkhorseTasks = pc.Is(CustomRoles.Workhorse);
+        if (appendWorkhorseTasks)
         {
             (hasCommonTasks, NumLongTasks, NumShortTasks) = Workhorse.TaskData;
         }
@@ -193,9 +194,12 @@ class RpcSetTasksPatch
         // Deleting tasks other than common tasks if common tasks are assigned
         // Empty the list if common tasks are not allocated
         int defaultCommonTasksNum = Main.RealOptionsData.GetInt(Int32OptionNames.NumCommonTasks);
-        if (hasCommonTasks) TasksList.RemoveRange(defaultCommonTasksNum, TasksList.Count - defaultCommonTasksNum);
-        else TasksList.Clear();
-        TasksList = Shuffle(TasksList);
+        if (!appendWorkhorseTasks)
+        {
+            if (hasCommonTasks) TasksList.RemoveRange(defaultCommonTasksNum, TasksList.Count - defaultCommonTasksNum);
+            else TasksList.Clear();
+            TasksList = Shuffle(TasksList);
+        }
 
         // A HashSet into which allocated tasks can be placed
         // Prevents multiple assignments of the same task

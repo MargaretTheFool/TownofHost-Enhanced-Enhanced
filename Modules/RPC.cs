@@ -5,6 +5,7 @@ using System;
 using TOHE.Modules;
 using TOHE.Modules.ChatManager;
 using TOHE.Patches;
+using TOHE.Roles.AddOns.Crewmate;
 using TOHE.Roles.AddOns.Impostor;
 using TOHE.Roles.Core;
 using TOHE.Roles.Crewmate;
@@ -128,6 +129,7 @@ enum CustomRPC : uint
     ReplayPlayerChat,
     DoubleAgentPlant,
     AntiBlackoutBuffer,
+    SyncWorkhorseTasks,
 }
 public enum Sounds
 {
@@ -480,6 +482,9 @@ internal class RPCHandlerPatch
                 break;
             case CustomRPC.SyncRoleSkill:
                 RPC.SyncRoleSkillReader(reader);
+                break;
+            case CustomRPC.SyncWorkhorseTasks:
+                Workhorse.ReceiveRPC(reader);
                 break;
             case CustomRPC.ClearPelicanOwner:
                 Pelican.ReceiveOwnerClear(reader, __instance);

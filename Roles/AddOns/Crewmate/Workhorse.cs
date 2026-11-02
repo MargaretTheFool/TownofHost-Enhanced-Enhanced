@@ -1,3 +1,5 @@
+using AmongUs.InnerNet.GameDataMessages;
+using Hazel;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using UnityEngine;
 using static TOHE.Options;
@@ -42,7 +44,9 @@ public class Workhorse : IAddon
         NumShortTasks = OptionNumShortTasks.GetInt();
     }
     public void Add(byte playerId, bool gameIsLoading = true)
-    { }
+    {
+        AddMidGame(playerId);
+    }
     public static void AddMidGame(byte playerId)
     {
         playerIdList.Add(playerId);
@@ -74,22 +78,69 @@ public class Workhorse : IAddon
     }
     public static bool OnAddTask(PlayerControl pc)
     {
+        // Only the host chooses recipients and extends their native task list.
+        if (!AmongUsClient.Instance.AmHost) return true;
         if (!CustomRoles.Workhorse.IsEnable() || playerIdList.Count >= CustomRoles.Workhorse.GetCount()) return true;
         if (!IsAssignTarget(pc)) return true;
 
-        pc.RpcSetCustomRole(CustomRoles.Workhorse);
-        var taskState = pc.GetPlayerTaskState();
-        taskState.AllTasksCount += NumLongTasks + NumShortTasks;
-        //taskState.CompletedTasksCount++; //Addition for this completion
-
-        if (AmongUsClient.Instance.AmHost)
+        int originalTaskCount = pc.Data.Tasks.Count;
+        var oldTaskTypes = new Il2CppStructArray<byte>(originalTaskCount);
+        var oldTasks = pc.myTasks.ToArray();
+        for (int i = 0; i < originalTaskCount; i++)
         {
-            AddMidGame(pc.PlayerId);
-            pc.Data.RpcSetTasks(new Il2CppStructArray<byte>(0)); // Redistribute tasks
-            pc.SyncSettings();
-            Utils.NotifyRoles(SpecifySeer: pc);
+            uint taskId = pc.Data.Tasks[i].Id;
+            var task = oldTasks.First(t => t.Id == taskId && t.TryCast<NormalPlayerTask>() != null);
+            oldTaskTypes[i] = (byte)task.Index;
         }
 
+        pc.RpcSetCustomRole(CustomRoles.Workhorse);
+        var taskState = pc.GetPlayerTaskState();
+        pc.Data.RpcSetTasks(oldTaskTypes);
+        taskState.AllTasksCount = pc.Data.Tasks.Count;
+        RestoreCompletedTasks(pc, originalTaskCount);
+        pc.Data.MarkDirty();
+        GameData.Instance.RecomputeTaskCounts();
+        Logger.Info($"Player {pc.PlayerId}: requested {NumLongTasks} long + {NumShortTasks} short, added {pc.Data.Tasks.Count - originalTaskCount}, progress {taskState.CompletedTasksCount}/{taskState.AllTasksCount}", "Workhorse");
+        CustomRpcTransport.Send(CustomRPC.SyncWorkhorseTasks, writer =>
+        {
+            writer.Write(pc.PlayerId);
+            writer.WritePacked(taskState.CompletedTasksCount);
+            writer.WritePacked(taskState.AllTasksCount);
+            writer.WritePacked(originalTaskCount);
+        });
+        CustomRpcTransport.FlushPending();
+        for (uint taskId = 0; taskId < originalTaskCount; taskId++)
+        {
+            var message = new RpcCompleteTaskMessage(pc.NetId, taskId);
+            AmongUsClient.Instance.LateBroadcastReliableMessage(message.Cast<IGameDataMessage>());
+        }
+        pc.SyncSettings();
+        Utils.NotifyRoles(SpecifySeer: pc);
+
+        // The original completion is already represented in the restored list.
         return false;
+    }
+
+    public static void ReceiveRPC(MessageReader reader)
+    {
+        byte playerId = reader.ReadByte();
+        int completed = reader.ReadPackedInt32();
+        int total = reader.ReadPackedInt32();
+        int originalTaskCount = reader.ReadPackedInt32();
+        var taskState = Main.PlayerStates[playerId].TaskState;
+        taskState.CompletedTasksCount = completed;
+        taskState.AllTasksCount = total;
+        RestoreCompletedTasks(Utils.GetPlayerById(playerId), originalTaskCount);
+    }
+
+    private static void RestoreCompletedTasks(PlayerControl pc, int originalTaskCount)
+    {
+        var tasks = pc.myTasks.ToArray();
+        for (int i = 0; i < originalTaskCount; i++)
+        {
+            var taskInfo = pc.Data.Tasks[i];
+            taskInfo.Complete = true;
+            tasks.First(t => t.Id == taskInfo.Id && t.TryCast<NormalPlayerTask>() != null).Complete();
+        }
     }
 }
