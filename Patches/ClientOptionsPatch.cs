@@ -1,4 +1,5 @@
 using UnityEngine;
+using TOHE.Modules;
 
 namespace TOHE;
 
@@ -37,6 +38,7 @@ public static class OptionsMenuBehaviourStartPatch
     private static ClientOptionItem CustomSoundsManage;
     private static ClientOptionItem EnableCustomDecorations;
     private static ClientOptionItem SwitchVanilla;
+    private static ClientOptionItem CloudSettings;
 
 #if DEBUG
     private static ClientOptionItem VersionCheat;
@@ -161,6 +163,8 @@ public static class OptionsMenuBehaviourStartPatch
                 Main.Instance.Unload();
             }
         }
+        if (CloudSettings == null || CloudSettings.ToggleButton == null)
+            CloudSettings = ClientOptionItem.Create("CloudSettings", null, __instance, () => CloudMenu.Open(__instance));
 
 #if DEBUG
         if (EOSManager.Instance.friendCode.GetDevUser().DeBug)
@@ -186,6 +190,7 @@ public static class OptionsMenuBehaviourClosePatch
 {
     public static void Postfix()
     {
+        CloudMenu.Close();
         ClientOptionItem.CustomBackground?.gameObject.SetActive(false);
     }
 }

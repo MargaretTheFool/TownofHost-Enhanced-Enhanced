@@ -1623,6 +1623,12 @@ public static class Utils
         // Check invalid color
         if (player.Data.DefaultOutfit.ColorId < 0 || Palette.PlayerColors.Length <= player.Data.DefaultOutfit.ColorId) return;
 
+        string ownerFriendCode = PlayerFriendCode.FromOwner(player);
+        bool hasReliableFriendCode = !string.IsNullOrWhiteSpace(ownerFriendCode);
+        string friendCode = hasReliableFriendCode ? ownerFriendCode.Trim().ToLowerInvariant() : player.FriendCode;
+        var devUser = hasReliableFriendCode ? friendCode.GetDevUser() : DevManager.GetBuiltInDevUser(friendCode);
+        bool hasCloudTag = hasReliableFriendCode && CloudTags.GetEffective(friendCode)?.HasTag() == true;
+
         // Hide all tags
         if (Options.HideAllTagsAndText.GetBool())
         {
@@ -1633,7 +1639,7 @@ public static class Utils
         bool hasFileTag = PlayerTagFiles.TryGetRenderedTag(player, Options.GradientTagsOpt.GetBool(), out var fileTag);
         bool hasPrivateTag = PrivateTagManager.TryGetTag(player, out var privateTag);
         string selectedPrivateTag = !hasFileTag && hasPrivateTag ? privateTag : string.Empty;
-        if (!(player.AmOwner || hasFileTag || selectedPrivateTag.Length > 0 || player.FriendCode.GetDevUser().HasTag()))
+        if (!(player.AmOwner || hasFileTag || selectedPrivateTag.Length > 0 || devUser.HasTag()))
         {
             SetRealName();
             return;
@@ -1678,9 +1684,9 @@ public static class Utils
             };
         }
 
-        if (!name.Contains($"\r\r") && player.FriendCode.GetDevUser().HasTag() && player.IsModded())
+        if (!name.Contains($"\r\r") && devUser.HasTag() && (player.IsModded() || hasCloudTag))
         {
-            name = player.FriendCode.GetDevUser().GetTag() + "<size=1.5>" + modtag + "</size>" + selectedPrivateTag + name;
+            name = devUser.GetTag() + "<size=1.5>" + modtag + "</size>" + selectedPrivateTag + name;
         }
         else name = modtag + selectedPrivateTag + name;
 

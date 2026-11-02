@@ -17,6 +17,7 @@ internal static class ServerRegion
     // The menu selection is restored after a cross-region game-code lookup.
     // Keep the region that supplied the listing until its endpoint is joined.
     public static IRegionInfo Current => connectedRegion ?? ServerManager.Instance?.CurrentRegion;
+    internal static string ConnectedMatchmakerAddress => connectedMatchmakerAddress;
     public static bool IsOfficialConnection => IsOfficialHost(connectedAddress) ||
         IsOfficialHost(connectedRegion != null ? connectedMatchmakerAddress : ServerManager.Instance?.CurrentUdpServer?.Ip);
 

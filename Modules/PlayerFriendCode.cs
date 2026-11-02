@@ -18,7 +18,13 @@ internal static class PlayerFriendCode
     // the connected owner and reject stale/reused player objects instead.
     internal static string FromOwner(PlayerControl player)
     {
-        if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmConnected || !AmongUsClient.Instance.AmHost
+        if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return string.Empty;
+        return FromConnectedOwner(player);
+    }
+
+    internal static string FromConnectedOwner(PlayerControl player)
+    {
+        if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmConnected
             || player == null || player.Data == null || player.Data.Disconnected || player.OwnerId < 0)
             return string.Empty;
         var owner = AmongUsClient.Instance.FindClientById(player.OwnerId);

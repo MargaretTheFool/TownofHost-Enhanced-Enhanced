@@ -37,6 +37,28 @@
   <ItemGroup>
     <PackageReference Include="GitInfo" Version="3.3.3" PrivateAssets="all" />
   </ItemGroup>
+  <!-- GitInfo 3.3.3's diff check omits untracked files. Replace it after the
+       Git root is known and before GitInfo consumes its dirty cache/input. -->
+  <Target Name="TOHE_CheckGitStatus" AfterTargets="_GitRoot">
+    <Error Condition="'$(GitRoot)' == ''" Text="GitInfo could not determine the repository root; refusing to generate ThisAssembly.Git.IsDirty." />
+    <Exec Command="$(GitExe) status --porcelain --untracked-files=normal"
+          WorkingDirectory="$(GitRoot)"
+          EchoOff="true"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          IgnoreExitCode="true"
+          StdOutEncoding="utf-8">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_TOHEEGitStatusOutput" />
+      <Output TaskParameter="ExitCode" PropertyName="_TOHEEGitStatusExitCode" />
+    </Exec>
+    <Error Condition="'$(_TOHEEGitStatusExitCode)' != '0'" Text="git status --porcelain --untracked-files=normal failed (exit code $(_TOHEEGitStatusExitCode)); refusing to generate ThisAssembly.Git.IsDirty." />
+    <PropertyGroup>
+      <GitIsDirty Condition="'$(_TOHEEGitStatusOutput)' == ''">0</GitIsDirty>
+      <GitIsDirty Condition="'$(_TOHEEGitStatusOutput)' != ''">1</GitIsDirty>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_GitIsDirtyFile)" Lines="$(GitIsDirty)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
   <Target Name="ValidateLocalGame" BeforeTargets="ResolveReferences" Condition="'$(LocalAmongUsPath)' != ''">
     <Error Condition="!Exists('$(LocalAmongUsPath)/BepInEx/interop/Assembly-CSharp.dll')" Text="LocalAmongUsPath must point to an Among Us 2026.9.29 (19.0) installation with generated BepInEx interop assemblies." />
     <Error Condition="!Exists('$(LocalAmongUsPath)/BepInEx/core/BepInEx.Unity.IL2CPP.dll')" Text="BepInEx IL2CPP is missing from LocalAmongUsPath." />

@@ -193,6 +193,7 @@ class DisconnectInternalPatch
     {
         // ExitGame calls DisconnectInternal directly, without OnDisconnected.
         BanManager.ClearSessionBans();
+        if (reason != DisconnectReasons.NewConnection) CloudService.Disconnect();
         Logger.Info($"Disconnect (Reason:{reason}:{stringReason}, ping:{__instance.Ping})", "Reason Disconnect");
         RehostManager.OnDisconnectInternal(reason);
     }

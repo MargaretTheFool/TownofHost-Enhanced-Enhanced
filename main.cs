@@ -485,6 +485,7 @@ public class Main : BasePlugin
 
     public override bool Unload()
     {
+        CloudService.Shutdown();
         OfficialSessionContext.Reset();
         OfficialAnticheatPolicy.Reset();
         TOHE.Patches.OfficialAnticheatLifecyclePatch.ResetOperations();
@@ -521,6 +522,7 @@ public class Main : BasePlugin
         EnableCustomSoundEffect = Config.Bind("Client Options", "EnableCustomSoundEffect", true);
         EnableCustomDecorations = Config.Bind("Client Options", "EnableCustomDecorations", true);
         SwitchVanilla = Config.Bind("Client Options", "SwitchVanilla", false);
+        CloudService.Initialize(Config);
 
         // Debug
         VersionCheat = Config.Bind("Client Options", "VersionCheat", false);

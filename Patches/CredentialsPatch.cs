@@ -452,6 +452,7 @@ class ModManagerLateUpdatePatch
     {
         __instance.ShowModStamp();
 
+        CloudService.Tick();
         LateTask.Update(Time.deltaTime);
         CheckMurderPatch.Update();
     }

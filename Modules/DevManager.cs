@@ -202,7 +202,8 @@ public static class DevManager
         DevUserList.Add(new(code: "taskunsold#2701", color: "null", userType: "t_ru", tag: "Translator", isUp: true, isDev: false, deBug: false, colorCmd: false, upName: null));
     }
     public static bool IsDevUser(this string code) => DevUserList.Any(x => x.Code == code);
-    public static DevUser GetDevUser(this string code) => code.IsDevUser() ? DevUserList.Find(x => x.Code == code) : DefaultDevUser;
+    internal static DevUser GetBuiltInDevUser(string code) => DevUserList.Find(x => x.Code == code) ?? DefaultDevUser;
+    public static DevUser GetDevUser(this string code) => Modules.CloudTags.GetEffective(code) ?? GetBuiltInDevUser(code);
     public static string GetUserType(this DevUser user)
     {
         string rolename = "Crewmate";

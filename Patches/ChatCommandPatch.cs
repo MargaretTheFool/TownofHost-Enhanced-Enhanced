@@ -48,6 +48,11 @@ internal class ChatCommands
             }
             return true;
         }
+        if (CloudService.TryHandleCommand(__instance.freeChatField.textArea.text))
+        {
+            __instance.freeChatField.Clear();
+            return false;
+        }
         if (!GameStates.IsModHost && !AmongUsClient.Instance.AmHost) return true;
         var text = __instance.freeChatField.textArea.text;
         var historyText = text;
