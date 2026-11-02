@@ -22,8 +22,33 @@ internal static class CloudTags
     private static bool refreshWhenOriginAvailable;
 
     internal static bool Enabled => enabled?.Value ?? true;
+    internal static bool IsLoading => pending != null;
 
     internal static DevUser GetEffective(string code) => Enabled && code != null && cache.TryGetValue(code.Trim().ToLowerInvariant(), out var user) ? user : null;
+
+    internal static bool TryGetHostDisplayUser(PlayerControl player, string ownerFriendCode, DevUser source,
+        out DevUser user, out bool colorOverridden)
+    {
+        user = null;
+        colorOverridden = false;
+        if (!Enabled || !AmongUsClient.Instance || !AmongUsClient.Instance.AmHost || !GameStates.IsOnlineGame
+            || player == null || !player.AmOwner || string.IsNullOrWhiteSpace(ownerFriendCode)
+            || CloudAccount.DisplayState is not { Bound: true, TagOverrides: { } fields } account
+            || !string.Equals(ownerFriendCode.Trim(), account.FriendCode?.Trim(), StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        bool tagOverridden = fields.TryGetProperty("tag", out var tag);
+        colorOverridden = fields.TryGetProperty("color", out var color);
+        if (!tagOverridden && !colorOverridden) return false;
+
+        // This copy is used only to render the host's name. The account's other
+        // overrides never enter the public cache or the permission lookup.
+        user = new DevUser(source.Code, source.Color, source.UserType, source.Tag, source.IsUp,
+            source.IsDev, source.DeBug, source.ColorCmd, source.NameCmd, source.UpName);
+        if (tagOverridden) user.Tag = ReadNullableString(tag, "null");
+        if (colorOverridden) user.Color = ReadNullableString(color, "null");
+        return true;
+    }
 
     internal static void Initialize(ConfigFile config)
     {
@@ -85,13 +110,20 @@ internal static class CloudTags
             // issue a parallel request; refresh once that request has drained.
             refreshAfterPending = true;
         }
-        CloudService.Notify(Translator.GetString("CloudTagsLoading"));
+        // A startup request can precede the selected language. Start it now,
+        // but do not translate a notification before initialization finishes.
+        var translation = DestroyableSingleton<TranslationController>._instance;
+        if (translation && translation.currentLanguage != null)
+            CloudService.Notify(Translator.GetString("CloudTagsLoading"));
     }
 
     internal static void Tick(Uri origin)
     {
         if (pending is { IsCompleted: true })
         {
+            var translation = DestroyableSingleton<TranslationController>._instance;
+            if (!translation || translation.currentLanguage == null) return;
+
             bool currentRequest = pendingGeneration == generation;
             bool refreshQueued = refreshAfterPending;
             var result = pending.IsCompletedSuccessfully ? pending.Result : null;
@@ -154,8 +186,16 @@ internal static class CloudTags
 
     private static void RefreshNames()
     {
-        if (GameStates.IsLobby)
+        if (AmongUsClient.Instance && GameStates.IsLobby)
             foreach (var player in Main.AllPlayerControls) Utils.ApplySuffix(player);
+    }
+
+    internal static void RefreshHostName()
+    {
+        var client = AmongUsClient.Instance;
+        var player = PlayerControl.LocalPlayer;
+        if (client && client.AmHost && GameStates.IsOnlineGame && GameStates.IsLobby && player && player.Data != null)
+            Utils.ApplySuffix(player);
     }
 
     private static string ReadNullableString(JsonElement value, string nullValue) =>

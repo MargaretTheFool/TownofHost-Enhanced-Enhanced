@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -9,24 +10,31 @@ internal static class CloudMenu
 {
     private static SpriteRenderer panel;
     private static TextMeshPro status;
+    private static TextMeshPro roomStatus;
     private static TextMeshPro notice;
     private static ToggleButtonBehaviour bind;
     private static ToggleButtonBehaviour accountRefresh;
     private static ToggleButtonBehaviour manage;
     private static ToggleButtonBehaviour share;
-    private static ToggleButtonBehaviour privateRoom;
+    private static ToggleButtonBehaviour roomShare;
     private static ToggleButtonBehaviour tags;
     private static ToggleButtonBehaviour tagsRefresh;
     private static ToggleButtonBehaviour systemProxy;
     private static bool restoreOptions;
+    private static readonly Dictionary<ToggleButtonBehaviour, bool> buttonStates = new();
+    private static CloudService.MenuState? renderedState;
+    private static SupportedLangs renderedLanguage;
 
     internal static void Close()
     {
         if (panel != null) Object.Destroy(panel.gameObject);
         panel = null;
         status = null;
+        roomStatus = null;
         notice = null;
-        bind = accountRefresh = manage = share = privateRoom = tags = tagsRefresh = systemProxy = null;
+        bind = accountRefresh = manage = share = roomShare = tags = tagsRefresh = systemProxy = null;
+        buttonStates.Clear();
+        renderedState = null;
         if (restoreOptions && ClientOptionItem.CustomBackground != null)
             ClientOptionItem.CustomBackground.gameObject.SetActive(true);
         restoreOptions = false;
@@ -50,29 +58,43 @@ internal static class CloudMenu
         warning.alignment = TextAlignmentOptions.Center;
         warning.enableWordWrapping = true;
         warning.enableAutoSizing = true;
-        warning.fontSizeMin = 0.75f;
-        warning.fontSizeMax = 1.45f;
         warning.overflowMode = TextOverflowModes.Ellipsis;
-        warning.rectTransform.sizeDelta = new Vector2(5.5f, 0.76f);
-        warning.transform.localPosition = new Vector3(0f, 2f, -5f);
+        warning.richText = false;
+        var anchor = warning.GetComponent<AspectPosition>();
+        if (anchor != null)
+        {
+            anchor.enabled = false;
+            Object.Destroy(anchor);
+        }
+        warning.transform.localScale = Vector3.one;
+        warning.rectTransform.anchorMin = warning.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        warning.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        warning.margin = Vector4.zero;
+        warning.fontSizeMin = 0.65f;
+        warning.fontSizeMax = 1.3f;
+        warning.rectTransform.sizeDelta = new Vector2(4.7f, 0.6f);
+        warning.transform.localPosition = new Vector3(0f, 2.12f, -5f);
+
+        roomStatus = Object.Instantiate(warning, panel.transform);
+        roomStatus.name = "CloudRoomStatus";
+        roomStatus.fontSizeMin = 0.75f;
+        roomStatus.fontSizeMax = 1.3f;
+        roomStatus.rectTransform.sizeDelta = new Vector2(4.7f, 0.3f);
+        roomStatus.transform.localPosition = new Vector3(0f, 1.65f, -5f);
 
         status = Object.Instantiate(warning, panel.transform);
         status.name = "CloudStatus";
-        status.richText = false;
-        status.fontSizeMin = 0.85f;
-        status.fontSizeMax = 1.4f;
-        status.overflowMode = TextOverflowModes.Ellipsis;
-        status.rectTransform.sizeDelta = new Vector2(5.5f, 0.96f);
-        status.transform.localPosition = new Vector3(0f, 1.10f, -5f);
+        status.fontSizeMin = 0.65f;
+        status.fontSizeMax = 1.25f;
+        status.rectTransform.sizeDelta = new Vector2(4.7f, 0.86f);
+        status.transform.localPosition = new Vector3(0f, 1.04f, -5f);
 
         notice = Object.Instantiate(warning, panel.transform);
         notice.name = "CloudNotice";
-        notice.richText = false;
-        notice.fontSizeMin = 0.85f;
-        notice.fontSizeMax = 1.25f;
-        notice.overflowMode = TextOverflowModes.Ellipsis;
-        notice.rectTransform.sizeDelta = new Vector2(5.5f, 0.32f);
-        notice.transform.localPosition = new Vector3(0f, -1.86f, -5f);
+        notice.fontSizeMin = 0.6f;
+        notice.fontSizeMax = 1.2f;
+        notice.rectTransform.sizeDelta = new Vector2(4.7f, 0.36f);
+        notice.transform.localPosition = new Vector3(0f, -1.85f, -5f);
         notice.text = CloudService.LastMessage;
 
         bind = Button("CloudBind", -1.3f, 0.38f, () => Run("/cloud bind"));
@@ -80,7 +102,7 @@ internal static class CloudMenu
         manage = Button("CloudManage", -1.3f, -0.20f, CloudService.ManageAccount);
         share = Button("CloudShareOn", 1.3f, -0.20f,
             () => Run(CloudService.ShareEnabled ? "/cloud share off" : "/cloud share on"));
-        privateRoom = Button("CloudPrivate", -1.3f, -0.78f, () => Run("/cloud private confirm"));
+        roomShare = Button("CloudRoomShare", -1.3f, -0.78f, CloudService.ToggleRoomShare);
         tags = Button("CloudTagsUse", 1.3f, -0.78f, () => CloudService.SetTagsEnabled(!CloudService.TagsEnabled));
         tagsRefresh = Button("CloudTagsRefresh", -1.3f, -1.36f, CloudService.RefreshTags);
         systemProxy = Button("CloudProxyUse", 1.3f, -1.36f, () => CloudService.SetUseSystemProxy(!CloudService.UseSystemProxy));
@@ -98,14 +120,21 @@ internal static class CloudMenu
             button.transform.localPosition = new Vector3(x, y, -5f);
             button.Text.DestroyTranslator();
             button.Text.text = Translator.GetString(label);
+            button.Text.transform.localScale = Vector3.one;
+            button.Text.transform.localPosition = new Vector3(0f, 0f, -1f);
+            button.Text.rectTransform.anchorMin = button.Text.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            button.Text.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            button.Text.rectTransform.sizeDelta = new Vector2(2.15f, 0.4f);
+            button.Text.margin = Vector4.zero;
+            button.Text.alignment = TextAlignmentOptions.Center;
             button.Text.enableWordWrapping = true;
             button.Text.enableAutoSizing = true;
-            button.Text.fontSizeMin = 0.95f;
-            button.Text.fontSizeMax = 1.55f;
+            button.Text.fontSizeMin = 0.7f;
+            button.Text.fontSizeMax = 1.4f;
             button.Text.overflowMode = TextOverflowModes.Ellipsis;
             var passive = button.GetComponent<PassiveButton>();
             passive.OnClick = new();
-            passive.OnClick.AddListener((UnityEngine.Events.UnityAction)(() => action()));
+            passive.OnClick.AddListener((UnityEngine.Events.UnityAction)(() => { action(); Refresh(); }));
             return button;
         }
     }
@@ -113,24 +142,33 @@ internal static class CloudMenu
     internal static void Refresh()
     {
         if (panel == null) return;
-        status.text = CloudService.AccountStatus();
+        var state = CloudService.CaptureMenuState();
+        var language = Translator.GetCommandLanguage();
+        if (renderedState == state && renderedLanguage == language) return;
+        renderedState = state;
+        renderedLanguage = language;
+        SetText(status, CloudService.AccountStatus());
+        SetText(roomStatus, CloudService.RoomStatusText());
         SetButton(bind, CloudService.CanBind);
-        SetButton(accountRefresh, !CloudAccount.IsLoading);
+        SetButton(accountRefresh, CloudService.CanRefreshAccount);
         SetButton(manage, CloudService.CanManage);
         SetButton(share, CloudService.CanChangeShare);
-        SetButton(privateRoom, CloudService.CanConfirmPrivate);
-        SetButton(tags, true);
-        SetButton(tagsRefresh, CloudService.TagsEnabled);
-        SetButton(systemProxy, true);
-        share.Text.text = Translator.GetString(CloudService.ShareEnabled ? "CloudShareOff" : "CloudShareOn");
-        tags.Text.text = Translator.GetString("CloudTagsUse") + ": " +
-            Translator.GetString(CloudService.TagsEnabled ? "CloudOptionOn" : "CloudOptionOff");
-        systemProxy.Text.text = Translator.GetString("CloudProxyUse") + ": " +
-            Translator.GetString(CloudService.UseSystemProxy ? "CloudOptionOn" : "CloudOptionOff");
+        SetButton(roomShare, CloudService.CanChangeRoomShare);
+        SetButton(tags, CloudService.CanChangeTags);
+        SetButton(tagsRefresh, CloudService.TagsEnabled && CloudService.CanChangeTags);
+        SetButton(systemProxy, CloudService.CanChangeProxy);
+        SetText(share.Text, Translator.GetString(CloudService.ShareEnabled ? "CloudShareOff" : "CloudShareOn"));
+        SetText(roomShare.Text, Translator.GetString(CloudService.RoomIsShared ? "CloudRoomStop" : "CloudRoomShare"));
+        SetText(tags.Text, Translator.GetString("CloudTagsUse") + ": " +
+            Translator.GetString(CloudService.TagsEnabled ? "CloudOptionOn" : "CloudOptionOff"));
+        SetText(systemProxy.Text, Translator.GetString("CloudProxyUse") + ": " +
+            Translator.GetString(CloudService.UseSystemProxy ? "CloudOptionOn" : "CloudOptionOff"));
     }
 
     private static void SetButton(ToggleButtonBehaviour button, bool enabled)
     {
+        if (buttonStates.TryGetValue(button, out bool previous) && previous == enabled) return;
+        buttonStates[button] = enabled;
         button.GetComponent<PassiveButton>().enabled = enabled;
         var color = enabled ? new Color32(255, 192, 203, byte.MaxValue) : new Color32(77, 77, 77, byte.MaxValue);
         button.Background.color = color;
@@ -139,6 +177,11 @@ internal static class CloudMenu
 
     internal static void UpdateStatus(string message)
     {
-        if (notice != null) notice.text = message;
+        if (notice != null) SetText(notice, message);
+    }
+
+    private static void SetText(TextMeshPro target, string value)
+    {
+        if (target.text != value) target.text = value;
     }
 }

@@ -1626,8 +1626,14 @@ public static class Utils
         string ownerFriendCode = PlayerFriendCode.FromOwner(player);
         bool hasReliableFriendCode = !string.IsNullOrWhiteSpace(ownerFriendCode);
         string friendCode = hasReliableFriendCode ? ownerFriendCode.Trim().ToLowerInvariant() : player.FriendCode;
-        var devUser = hasReliableFriendCode ? friendCode.GetDevUser() : DevManager.GetBuiltInDevUser(friendCode);
-        bool hasCloudTag = hasReliableFriendCode && CloudTags.GetEffective(friendCode)?.HasTag() == true;
+        var publicCloudUser = hasReliableFriendCode ? CloudTags.GetEffective(friendCode) : null;
+        var devUser = publicCloudUser ?? DevManager.GetBuiltInDevUser(friendCode);
+        DevUser hostCloudUser = null;
+        bool colorOverridden = false;
+        bool hasHostCloudUser = hasReliableFriendCode && CloudTags.TryGetHostDisplayUser(player, friendCode, devUser,
+            out hostCloudUser, out colorOverridden);
+        if (hasHostCloudUser) devUser = hostCloudUser;
+        bool hasCloudTag = (hasHostCloudUser ? devUser : publicCloudUser)?.HasTag() == true;
 
         // Hide all tags
         if (Options.HideAllTagsAndText.GetBool())
@@ -1686,7 +1692,7 @@ public static class Utils
 
         if (!name.Contains($"\r\r") && devUser.HasTag() && (player.IsModded() || hasCloudTag))
         {
-            name = devUser.GetTag() + "<size=1.5>" + modtag + "</size>" + selectedPrivateTag + name;
+            name = devUser.GetTag(!hasHostCloudUser || !colorOverridden) + "<size=1.5>" + modtag + "</size>" + selectedPrivateTag + name;
         }
         else name = modtag + selectedPrivateTag + name;
 

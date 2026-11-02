@@ -15,20 +15,27 @@ namespace TOHE.Modules;
 internal static class CloudService
 {
     internal sealed record Response(HttpStatusCode Status, string Body, int RetryAfterSeconds);
+    internal readonly record struct MenuState(bool UserAgentReady, string UserAgent, bool HasIdentity,
+        bool AccountLoading, bool AccountRequestInFlight, CloudAccount.State Account, string AccountError, bool TagsLoading,
+        bool OnlineRoom, bool CurrentRoom, bool IsHost, CloudRooms.SharingStatus Room,
+        bool RoomManuallyStopped, bool ShareEnabled, bool TagsEnabled, bool UseSystemProxy);
     private static readonly HttpClient systemProxyHttp = new(new HttpClientHandler { UseProxy = true }) { Timeout = TimeSpan.FromSeconds(10) };
     private static readonly HttpClient directHttp = new(new HttpClientHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(10) };
-    private static ConfigEntry<string> endpoint;
+    private static readonly Uri Origin = new("https://tohee.niko233.top/");
     private static ConfigEntry<bool> shareRooms;
     private static ConfigEntry<bool> systemProxy;
     private static volatile bool useSystemProxy = true;
     private static Uri accountOrigin;
     private static string accountToken;
     private static string accountPuid;
+    private static CloudAccount.State displayedAccount;
     private static float nextTick;
     private static int sessionGame;
     private static int sessionHost = -1;
     private static uint sessionGeneration;
     private static bool privateConfirmed;
+    private static bool roomManuallyStopped;
+    private static string sessionRoomKey;
     private static bool wasPublic;
     private static int gameVersion;
     private static bool snapshotUnavailable;
@@ -40,18 +47,47 @@ internal static class CloudService
     internal static bool ShareEnabled => shareRooms?.Value == true;
     internal static bool TagsEnabled => CloudTags.Enabled;
     internal static bool UseSystemProxy => useSystemProxy;
-    internal static bool CanBind => Origin != null && CloudUserAgent.TryGet(out _) && !CloudAccount.IsLoading
+    private static bool IsCurrentRoom
+    {
+        get
+        {
+            var client = AmongUsClient.Instance;
+            return client && client.AmConnected && GameStates.IsOnlineGame
+                && sessionHost == client.HostId && sessionGame == client.GameId && sessionGeneration == OnGameJoinedPatch.Generation;
+        }
+    }
+    private static CloudRooms.SharingStatus RoomStatus => CloudRooms.GetStatus(IsCurrentRoom ? sessionRoomKey : null);
+    private static bool RoomRequestInFlight => CloudRooms.GetStatus(null).IsRequestInFlight;
+    private static bool IsBusy => CloudAccount.IsRequestInFlight || CloudTags.IsLoading || RoomRequestInFlight;
+    internal static bool CanBind => !IsBusy && !CloudAccount.IsLoading && CloudUserAgent.TryGet(out _)
         && CloudAccount.Current is { Bound: false };
-    private static bool CanEnableShare => Origin != null && CloudUserAgent.TryGet(out _) && !CloudAccount.IsLoading
+    private static bool CanEnableShare => CloudUserAgent.TryGet(out _) && !CloudAccount.IsLoading
         && CloudAccount.Current is { SharingAllowed: true };
-    internal static bool CanChangeShare => ShareEnabled || CanEnableShare;
-    internal static bool CanConfirmPrivate => ShareEnabled && CanEnableShare;
-    internal static bool CanManage => Origin != null;
+    internal static bool CanRefreshAccount => !IsBusy && !CloudAccount.IsLoading;
+    internal static bool CanChangeShare => !IsBusy && (ShareEnabled || CanEnableShare);
+    internal static bool CanChangeTags => !IsBusy;
+    internal static bool CanChangeProxy => !IsBusy;
+    internal static bool RoomIsShared => RoomStatus.IsShared;
+    internal static bool CanChangeRoomShare => IsCurrentRoom && AmongUsClient.Instance.AmHost
+        && !IsBusy && (RoomIsShared || (ShareEnabled && CanEnableShare));
+    internal static bool CanManage => !IsBusy;
     internal static string LastMessage { get; private set; } = string.Empty;
+
+    internal static MenuState CaptureMenuState()
+    {
+        bool userAgentReady = CloudUserAgent.TryGet(out string userAgent);
+        var client = AmongUsClient.Instance;
+        bool onlineRoom = client && client.AmConnected && GameStates.IsOnlineGame;
+        bool currentRoom = onlineRoom && sessionHost == client.HostId && sessionGame == client.GameId
+            && sessionGeneration == OnGameJoinedPatch.Generation;
+        var room = CloudRooms.GetStatus(currentRoom ? sessionRoomKey : null);
+        return new(userAgentReady, userAgent, accountToken != null && accountPuid != null,
+            CloudAccount.IsLoading, CloudAccount.IsRequestInFlight, CloudAccount.Current, CloudAccount.Error, CloudTags.IsLoading,
+            onlineRoom, currentRoom, onlineRoom && client.AmHost, room, roomManuallyStopped, ShareEnabled, TagsEnabled, UseSystemProxy);
+    }
 
     internal static void Initialize(ConfigFile config)
     {
-        endpoint = config.Bind("TOHEE Cloud", "Origin", "https://tohee.niko233.top/", "HTTPS origin of the Cloud deployment; blank disables Cloud.");
         shareRooms = config.Bind("TOHEE Cloud", "Share rooms", false, "Room codes become visible to eligible Cloud users and authorized API callers.");
         if (systemProxy != null) systemProxy.SettingChanged -= OnSystemProxyChanged;
         systemProxy = config.Bind("TOHEE Cloud", "Use system proxy", true, "Use the default system proxy for Cloud HTTP requests; disable to connect directly.");
@@ -62,17 +98,6 @@ internal static class CloudService
     }
 
     private static void OnSystemProxyChanged(object sender, EventArgs args) => useSystemProxy = systemProxy.Value;
-
-    private static Uri Origin
-    {
-        get
-        {
-            if (!Uri.TryCreate(endpoint?.Value, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps
-                || !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment)
-                || uri.AbsolutePath != "/") return null;
-            return uri;
-        }
-    }
 
     private static void ReadIdentity(out string token, out string puid)
     {
@@ -109,9 +134,16 @@ internal static class CloudService
             Notify(SharingReason(forbidden.Reason));
         }
 
-        if (origin == null || token == null || puid == null || !CloudUserAgent.TryGet(out _)) CloudRooms.Stop();
+        if (token == null || puid == null || !CloudUserAgent.TryGet(out _)) CloudRooms.Stop();
         else if (CloudAccount.IsLoading) CloudRooms.Pause();
         else if (CloudAccount.Current?.SharingAllowed != true) CloudRooms.Stop();
+
+        var displayState = CloudAccount.DisplayState;
+        if (!ReferenceEquals(displayedAccount, displayState))
+        {
+            displayedAccount = displayState;
+            CloudTags.RefreshHostName();
+        }
     }
 
     internal static void Tick()
@@ -139,11 +171,13 @@ internal static class CloudService
             privateConfirmed = false;
             CloudRooms.Stop();
         }
+        // Room requests run on a worker; refresh every frame so the controls lock
+        // as soon as a request starts and unlock as soon as it finishes.
+        CloudMenu.Refresh();
         if (now < nextTick) return;
         nextTick = now + 1f;
         while (CloudRooms.Messages.TryDequeue(out string message)) Notify(Translator.GetString(message));
         CloudTags.Tick(origin);
-        CloudMenu.Refresh();
 
         if (!client || !client.AmConnected || !GameStates.IsOnlineGame)
         {
@@ -152,7 +186,16 @@ internal static class CloudService
         }
         if (sessionHost != client.HostId || sessionGame != client.GameId || sessionGeneration != OnGameJoinedPatch.Generation)
         {
+            bool sameRoom = sessionHost != -1 && sessionGame == client.GameId
+                && sessionGeneration == OnGameJoinedPatch.Generation;
+            bool stopped = roomManuallyStopped;
+            string previousRoomKey = sessionRoomKey;
             Disconnect();
+            if (sameRoom)
+            {
+                roomManuallyStopped = stopped;
+                sessionRoomKey = previousRoomKey;
+            }
             sessionHost = client.HostId;
             sessionGame = client.GameId;
             sessionGeneration = OnGameJoinedPatch.Generation;
@@ -161,10 +204,11 @@ internal static class CloudService
         }
         if (wasPublic && !client.IsGamePublic) privateConfirmed = false;
         wasPublic = client.IsGamePublic;
-        if (!client.AmHost || origin == null || token == null || puid == null || !ShareEnabled
-            || CloudAccount.IsLoading || CloudAccount.Current?.SharingAllowed != true || (!client.IsGamePublic && !privateConfirmed))
+        if (!client.AmHost || token == null || puid == null || !ShareEnabled
+            || roomManuallyStopped || CloudAccount.IsLoading || CloudAccount.Current?.SharingAllowed != true
+            || (!client.IsGamePublic && !privateConfirmed))
         {
-            if (!client.AmHost || !ShareEnabled || (!client.IsGamePublic && !privateConfirmed)) CloudRooms.Stop();
+            if (!client.AmHost || !ShareEnabled || roomManuallyStopped || (!client.IsGamePublic && !privateConfirmed)) CloudRooms.Stop();
             return;
         }
         if (!CloudRooms.TrySnapshot(client, gameVersion, CloudAccount.Current.Regions, out string snapshot, out string roomKey))
@@ -178,6 +222,7 @@ internal static class CloudService
             return;
         }
         snapshotUnavailable = false;
+        sessionRoomKey = roomKey;
         CloudRooms.Publish(origin, puid, token, roomKey, snapshot);
     }
 
@@ -186,6 +231,8 @@ internal static class CloudService
         CloudRooms.Stop();
         sessionHost = -1;
         privateConfirmed = false;
+        roomManuallyStopped = false;
+        sessionRoomKey = null;
         wasPublic = false;
         snapshotUnavailable = false;
     }
@@ -200,6 +247,7 @@ internal static class CloudService
 
     internal static void RefreshAccount(bool ensureAfterCurrent = false)
     {
+        if (!ensureAfterCurrent && !CanRefreshAccount) return;
         Uri origin = Origin;
         ReadIdentity(out string token, out string puid);
         SyncAccount(origin, token, puid, Time.realtimeSinceStartup);
@@ -214,6 +262,11 @@ internal static class CloudService
 
     internal static void SetTagsEnabled(bool enabled)
     {
+        if (!CanChangeTags)
+        {
+            Notify(Translator.GetString("CloudRequestInProgress"));
+            return;
+        }
         CloudTags.SetEnabled(enabled, Origin);
         if (!enabled) Notify(Translator.GetString("CloudTagsDisabled"));
         CloudMenu.Refresh();
@@ -221,17 +274,65 @@ internal static class CloudService
 
     internal static void SetUseSystemProxy(bool enabled)
     {
+        if (!CanChangeProxy)
+        {
+            Notify(Translator.GetString("CloudRequestInProgress"));
+            return;
+        }
         systemProxy.Value = enabled;
         CloudMenu.Refresh();
     }
 
-    internal static void RefreshTags() => CloudTags.Refresh(Origin);
+    internal static void RefreshTags()
+    {
+        if (!CanChangeTags) Notify(Translator.GetString("CloudRequestInProgress"));
+        else CloudTags.Refresh(Origin);
+        CloudMenu.Refresh();
+    }
+
+    internal static void ToggleRoomShare() => RequestRoomSharing(RoomIsShared);
+
+    private static void RequestRoomSharing(bool stop)
+    {
+        if (IsBusy)
+        {
+            Notify(Translator.GetString("CloudRequestInProgress"));
+            return;
+        }
+        var client = AmongUsClient.Instance;
+        if (!IsCurrentRoom || !client.AmHost || (!stop && (!ShareEnabled || !CanEnableShare)))
+        {
+            Notify(Translator.GetString("CloudRoomControlUnavailable"));
+            return;
+        }
+
+        if (stop)
+        {
+            roomManuallyStopped = true;
+            privateConfirmed = false;
+            CloudRooms.Stop();
+            Notify(Translator.GetString("CloudRoomStopRequested"));
+        }
+        else
+        {
+            roomManuallyStopped = false;
+            if (!client.IsGamePublic)
+            {
+                if (wasPublic) CloudRooms.Stop();
+                wasPublic = false;
+                privateConfirmed = true;
+            }
+            Notify(Translator.GetString("CloudRoomShareRequested"));
+            nextTick = 0f;
+            Tick();
+        }
+        CloudMenu.Refresh();
+    }
 
     internal static void ManageAccount()
     {
-        Uri origin = Origin;
-        if (origin == null) Notify(Translator.GetString("CloudOriginDisabled"));
-        else OpenBrowser(new Uri(origin, "/accounts").AbsoluteUri);
+        if (IsBusy) Notify(Translator.GetString("CloudRequestInProgress"));
+        else OpenBrowser(new Uri(Origin, "/accounts").AbsoluteUri);
     }
 
     private static bool OpenBrowser(string url)
@@ -280,7 +381,6 @@ internal static class CloudService
 
     internal static string AccountStatus()
     {
-        if (Origin == null) return Translator.GetString("CloudOriginDisabled");
         if (!CloudUserAgent.TryGet(out string userAgentError)) return Translator.GetString(userAgentError);
         if (accountToken == null || accountPuid == null) return Translator.GetString("CloudLoginRequired");
         if (CloudAccount.IsLoading) return Translator.GetString("CloudAccountLoading");
@@ -312,6 +412,24 @@ internal static class CloudService
         return account + "\n" + sharing + tag;
     }
 
+    internal static string RoomStatusText()
+    {
+        var client = AmongUsClient.Instance;
+        if (!client || !client.AmConnected || !GameStates.IsOnlineGame)
+            return Translator.GetString("CloudRoomStatusNoRoom");
+
+        var state = RoomStatus;
+        return Translator.GetString(state.Operation switch
+        {
+            CloudRooms.RequestOperation.Create => "CloudRoomStatusSharing",
+            CloudRooms.RequestOperation.Update when state.IsShared => "CloudRoomStatusUpdating",
+            CloudRooms.RequestOperation.Update => "CloudRoomStatusSharing",
+            CloudRooms.RequestOperation.Delete => "CloudRoomStatusStopping",
+            _ when state.IsShared && roomManuallyStopped => "CloudRoomStatusStopPending",
+            _ => state.IsShared ? "CloudRoomStatusShared" : "CloudRoomStatusNotShared"
+        });
+    }
+
     private static string SharingReason(string reason) => Translator.GetString(reason switch
     {
         "PUID_NOT_REGISTERED" => "CloudSharingUnbound",
@@ -339,13 +457,19 @@ internal static class CloudService
         if (args.Length == 3 && args[1].Equals("account", StringComparison.OrdinalIgnoreCase)
             && args[2].Equals("refresh", StringComparison.OrdinalIgnoreCase))
         {
-            RefreshAccount();
-            Notify(AccountStatus());
+            if (!CanRefreshAccount) Notify(Translator.GetString("CloudRequestInProgress"));
+            else
+            {
+                RefreshAccount();
+                Notify(AccountStatus());
+            }
             return true;
         }
         if (args.Length == 2 && args[1].Equals("bind", StringComparison.OrdinalIgnoreCase))
         {
-            if (CloudAccount.Current is { Bound: true } && !CloudAccount.IsLoading)
+            if (IsBusy)
+                Notify(Translator.GetString("CloudRequestInProgress"));
+            else if (CloudAccount.Current is { Bound: true })
                 Notify(Translator.GetString("CloudAlreadyBound"));
             else if (!CanBind) Notify(AccountStatus());
             else if (!CloudBinding.TryCreateLink(origin, token, CloudAccount.Current.BindingPublicKeys, out string url))
@@ -383,7 +507,8 @@ internal static class CloudService
             && (args[2].Equals("on", StringComparison.OrdinalIgnoreCase) || args[2].Equals("off", StringComparison.OrdinalIgnoreCase)))
         {
             bool enable = args[2].Equals("on", StringComparison.OrdinalIgnoreCase);
-            if (enable && !CanEnableShare) Notify(AccountStatus());
+            if (IsBusy) Notify(Translator.GetString("CloudRequestInProgress"));
+            else if (enable && !CanEnableShare) Notify(AccountStatus());
             else
             {
                 shareRooms.Value = enable;
@@ -397,13 +522,8 @@ internal static class CloudService
             && args[2].Equals("confirm", StringComparison.OrdinalIgnoreCase))
         {
             var client = AmongUsClient.Instance;
-            if (CanConfirmPrivate && client && client.AmConnected && client.AmHost && GameStates.IsOnlineGame && !client.IsGamePublic
-                && sessionHost == client.HostId && sessionGame == client.GameId && sessionGeneration == OnGameJoinedPatch.Generation)
-            {
-                privateConfirmed = true;
-                wasPublic = false;
-                Notify(Translator.GetString("CloudPrivateConfirmed"));
-            }
+            if (IsBusy) Notify(Translator.GetString("CloudRequestInProgress"));
+            else if (client && !client.IsGamePublic) RequestRoomSharing(false);
             else Notify(Translator.GetString("CloudPrivateUnavailable"));
             return true;
         }
@@ -415,7 +535,8 @@ internal static class CloudService
     {
         LastMessage = message;
         CloudMenu.UpdateStatus(message);
-        if (HudManager.Instance) HudManager.Instance.Notifier.AddDisconnectMessage(message);
+        var hud = DestroyableSingleton<HudManager>._instance;
+        if (hud && hud.Notifier) hud.Notifier.AddDisconnectMessage(message);
     }
 
     internal static async Task<Response> Send(Uri origin, HttpMethod method, string path, string token, string json = null)

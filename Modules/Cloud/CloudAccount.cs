@@ -33,7 +33,11 @@ internal static class CloudAccount
     private static float lastNow;
 
     internal static bool IsLoading => pending != null || refreshRequested;
+    internal static bool IsRequestInFlight => pending != null;
     internal static State Current => IsLoading || Error != null ? null : current;
+    // Display only: unlike Current, this can retain the last successful state
+    // while the same identity is being refreshed.
+    internal static State DisplayState => Error == null ? current : null;
     // These are diagnostic codes, not display strings.
     internal static string Error { get; private set; }
 
@@ -146,6 +150,12 @@ internal static class CloudAccount
                 if (string.IsNullOrWhiteSpace(friendCode)) return new(null, "INVALID_RESPONSE", 0);
                 var fields = tags.GetProperty("overrides");
                 if (fields.ValueKind != JsonValueKind.Object) return new(null, "INVALID_RESPONSE", 0);
+                if (fields.TryGetProperty("tag", out var tag)
+                    && tag.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
+                    return new(null, "INVALID_RESPONSE", 0);
+                if (fields.TryGetProperty("color", out var color)
+                    && color.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
+                    return new(null, "INVALID_RESPONSE", 0);
                 overrides = fields.Clone();
             }
             else if (account.ValueKind != JsonValueKind.Null || tags.ValueKind != JsonValueKind.Null)

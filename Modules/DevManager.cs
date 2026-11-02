@@ -17,14 +17,15 @@ public class DevUser(string code = "", string color = "null", string userType = 
 
     public bool HasTag() => Tag != "null";
     //public string GetTag() => Color == "null" ? $"<size=1.2>{Tag}</size>\r\n" : $"<color={Color}><size=1.2>{(Tag == "#Dev" ? Translator.GetString("Developer") : Tag)}</size></color>\r\n";
-    public string GetTag()
+    public string GetTag() => GetTag(true);
+    public string GetTag(bool useLocalColor)
     {
         string tagColorFilePath = @$"./TOHE-DATA/Tags/SPONSOR_TAGS/{Code}.txt";
 
         if (Color == "null" || Color == string.Empty) return $"<size=1.2>{Tag}</size>\r\n";
         var startColor = Color.TrimStart('#');
 
-        if (File.Exists(tagColorFilePath))
+        if (useLocalColor && File.Exists(tagColorFilePath))
         {
             var ColorCode = File.ReadAllText(tagColorFilePath).Trim();
             if (Utils.CheckColorHex(ColorCode)) startColor = ColorCode;

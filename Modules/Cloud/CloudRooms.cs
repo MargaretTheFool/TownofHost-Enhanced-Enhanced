@@ -12,6 +12,8 @@ namespace TOHE.Modules;
 internal static class CloudRooms
 {
     internal sealed record Forbidden(Uri Origin, string Identity, string Token, string Reason);
+    internal enum RequestOperation { None, Create, Update, Delete }
+    internal readonly record struct SharingStatus(bool IsShared, bool IsRequestInFlight, RequestOperation Operation);
     private sealed record Acknowledgement(string RoomId, long Revision, DateTimeOffset AcceptedAt,
         DateTimeOffset ExpiresAt, int HeartbeatAfterSeconds);
 
@@ -54,6 +56,13 @@ internal static class CloudRooms
     private static long retryAt;
     private static long rateLimitedUntil;
     private static long heartbeatAt;
+    private static Uri confirmedOrigin;
+    private static string confirmedIdentity;
+    private static string confirmedKey;
+    private static string confirmedRoomId;
+    private static long confirmedUntil;
+    private static string requestKey;
+    private static RequestOperation requestOperation;
     private static string lastNotice;
     private static Uri unauthorizedOrigin;
     private static string unauthorizedToken;
@@ -129,6 +138,13 @@ internal static class CloudRooms
         && Uri.Compare(actual, known, UriComponents.SchemeAndServer, UriFormat.UriEscaped, StringComparison.OrdinalIgnoreCase) == 0
         && string.Equals(actual.AbsolutePath.TrimEnd('/'), known.AbsolutePath.TrimEnd('/'), StringComparison.Ordinal);
 
+    internal static SharingStatus GetStatus(string roomKey)
+    {
+        lock (gate)
+            return new(roomKey != null && roomKey == confirmedKey && Environment.TickCount64 < confirmedUntil,
+                running, roomKey != null && roomKey == requestKey ? requestOperation : RequestOperation.None);
+    }
+
     internal static void Publish(Uri origin, string identity, string token, string key, string snapshot)
     {
         lock (gate)
@@ -199,7 +215,7 @@ internal static class CloudRooms
         {
             Uri origin;
             string identity, token, key, snapshot, roomId;
-            long version, epoch;
+            long version, epoch, requestStartedAt;
             bool deleting;
             HttpMethod method;
             Task<CloudService.Response> pendingRequest;
@@ -220,6 +236,9 @@ internal static class CloudRooms
                 if (token == unauthorizedToken && origin == unauthorizedOrigin) { running = false; return; }
                 version = desiredVersion;
                 method = deleting ? HttpMethod.Delete : roomId == null ? HttpMethod.Post : HttpMethod.Put;
+                requestKey = key;
+                requestOperation = deleting ? RequestOperation.Delete : roomId == null ? RequestOperation.Create : RequestOperation.Update;
+                requestStartedAt = Environment.TickCount64;
                 string path = roomId == null ? "/api/mod/rooms" : "/api/mod/rooms/" + Uri.EscapeDataString(roomId);
                 // Start the asynchronous request before Pause or Stop can take the gate.
                 pendingRequest = CloudService.Send(origin, method, path, token, snapshot);
@@ -247,7 +266,7 @@ internal static class CloudRooms
                 catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException) { }
             }
             string reason = "FORBIDDEN";
-            if (!deleting && response.Status == HttpStatusCode.Forbidden)
+            if (response.Status == HttpStatusCode.Forbidden)
             {
                 try
                 {
@@ -261,6 +280,8 @@ internal static class CloudRooms
 
             lock (gate)
             {
+                requestKey = null;
+                requestOperation = RequestOperation.None;
                 // Keep a returned ID even if another ACK field is invalid, so a late create can still be removed.
                 if (!deleting && method == HttpMethod.Post && !string.IsNullOrWhiteSpace(acknowledgedId))
                 {
@@ -270,6 +291,11 @@ internal static class CloudRooms
                 }
                 if (deleting && response.Status is HttpStatusCode.NoContent or HttpStatusCode.OK or HttpStatusCode.NotFound)
                 {
+                    if (confirmedOrigin == origin && confirmedIdentity == identity && confirmedRoomId == roomId)
+                    {
+                        confirmedKey = confirmedRoomId = confirmedIdentity = null;
+                        confirmedOrigin = null;
+                    }
                     activeRoomId = activeKey = activeToken = activeIdentity = activeSnapshot = null;
                     activeOrigin = null;
                     retryAt = rateLimitedUntil = 0;
@@ -281,6 +307,9 @@ internal static class CloudRooms
                     activeOrigin = origin; activeIdentity = identity; activeKey = key; activeRoomId = ack.RoomId; activeEpoch = epoch;
                     activeToken = desiredOrigin == origin && desiredIdentity == identity ? desiredToken : token;
                     activeSnapshot = snapshot;
+                    confirmedOrigin = origin; confirmedIdentity = identity; confirmedKey = key; confirmedRoomId = ack.RoomId;
+                    // Measure the server-provided lifetime without relying on the client's wall clock.
+                    confirmedUntil = requestStartedAt + (long)(ack.ExpiresAt - ack.AcceptedAt).TotalMilliseconds;
                     heartbeatAt = Environment.TickCount64 + ack.HeartbeatAfterSeconds * 1000L;
                     retryAt = rateLimitedUntil = 0;
                     lastNotice = null;
@@ -290,9 +319,21 @@ internal static class CloudRooms
                 }
                 if (method == HttpMethod.Put && response.Status == HttpStatusCode.NotFound)
                 {
+                    if (confirmedOrigin == origin && confirmedIdentity == identity && confirmedRoomId == roomId)
+                    {
+                        confirmedKey = confirmedRoomId = confirmedIdentity = null;
+                        confirmedOrigin = null;
+                    }
                     activeRoomId = activeKey = activeToken = activeIdentity = activeSnapshot = null;
                     activeOrigin = null;
                     continue;
+                }
+                // The server removes an account's rooms when sharing is denied for these reasons.
+                if (response.Status == HttpStatusCode.Forbidden && confirmedOrigin == origin && confirmedIdentity == identity
+                    && reason is "PUID_NOT_REGISTERED" or "USER_BANNED" or "ACCOUNT_BANNED" or "ACCOUNT_REQUIRED" or "SHARING_DISABLED")
+                {
+                    confirmedKey = confirmedRoomId = confirmedIdentity = null;
+                    confirmedOrigin = null;
                 }
                 if (!deleting && response.Status == HttpStatusCode.Forbidden)
                 {
