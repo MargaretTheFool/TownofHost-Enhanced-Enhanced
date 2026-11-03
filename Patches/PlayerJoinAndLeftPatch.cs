@@ -54,6 +54,7 @@ class OnGameJoinedPatch
 
     private static void InitializeSession(AmongUsClient __instance)
     {
+        OptionItem.SetRemotePreset(!__instance.AmHost);
         var generation = Generation;
         Logger.Info($"{__instance.GameId} Joining room - Room code: {GameCode.IntToGameName(AmongUsClient.Instance.GameId) ?? string.Empty}", "OnGameJoined");
 
@@ -606,11 +607,6 @@ class InnerNetClientSpawnPatch
         else
         {
             Logger.Msg($"Spawn player data: ID {ownerId}: {client.PlayerName}", "InnerNetClientSpawn");
-            _ = Schedule(() =>
-            {
-                OptionItem.SyncAllOptions(client.Id);
-            }, 3f, "Sync All Options For New Player");
-
             _ = Schedule(() =>
             {
                 if (Main.OverrideWelcomeMsg != "") Utils.SendMessage(Main.OverrideWelcomeMsg, client.Character.PlayerId);

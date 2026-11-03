@@ -14,10 +14,17 @@ public abstract class OptionItem
     private static readonly Dictionary<int, string> nameSettings = [];
 
     private static int currentPreset;
+    private static bool remotePresetActive;
+    public static bool IsRemotePreset => remotePresetActive;
+    public static bool HasRemotePreset { get; internal set; }
     public static int CurrentPreset
     {
-        get => currentPreset;
-        set => currentPreset = Math.Clamp(value, 0, NumPresets - 1);
+        get => remotePresetActive ? RemotePreset : currentPreset;
+        set
+        {
+            currentPreset = Math.Clamp(value, 0, NumPresets - 1);
+            remotePresetActive = false;
+        }
     }
     #endregion
 
@@ -27,6 +34,8 @@ public abstract class OptionItem
     public int DefaultValue { get; }
     public TabGroup Tab { get; }
     public bool IsSingleValue { get; }
+    // Remote slot 9 is session-only; SingleValue and AllValues remain local save data.
+    private int remoteValue;
 
     // Nullable/Empty Variables
     public Color NameColor { get; protected set; }
@@ -72,6 +81,7 @@ public abstract class OptionItem
         Id = id;
         Name = name;
         DefaultValue = defaultValue;
+        remoteValue = defaultValue;
         Tab = tab;
         IsSingleValue = isSingleValue;
         IsVanillaText = vanillaStr;
@@ -181,7 +191,7 @@ public abstract class OptionItem
     {
         return ApplyFormat(CurrentValue.ToString());
     }
-    public virtual int GetValue() => IsSingleValue ? SingleValue : AllValues[CurrentPreset];
+    public virtual int GetValue() => IsRemotePreset ? remoteValue : IsSingleValue ? SingleValue : AllValues[CurrentPreset];
 
     // Deprecated IsHidden function
     public virtual bool IsHiddenOn(CustomGameMode mode)
@@ -213,7 +223,11 @@ public abstract class OptionItem
     public virtual void SetValue(int afterValue, bool doSave, bool doSync = true)
     {
         int beforeValue = CurrentValue;
-        if (IsSingleValue)
+        if (IsRemotePreset)
+        {
+            remoteValue = afterValue;
+        }
+        else if (IsSingleValue)
         {
             SingleValue = afterValue;
         }
@@ -224,10 +238,9 @@ public abstract class OptionItem
 
         CallUpdateValueEvent(beforeValue, afterValue);
         Refresh();
-        if (doSync)
+        if (doSync && beforeValue != afterValue)
         {
-            SyncAllOptions();
-            // RPC.SyncCustomSettingsRPCforOneOption(this);
+            RPC.SyncCustomSettingRPC(this);
         }
         if (doSave)
         {
@@ -266,6 +279,62 @@ public abstract class OptionItem
 
         if (doSync) SyncAllOptions();
     }
+    public static void SetRemotePreset(bool active)
+    {
+        if (remotePresetActive == active) return;
+        remotePresetActive = active;
+        if (active) HasRemotePreset = false;
+        foreach (var option in AllOptions) option.Refresh();
+    }
+    public static bool CopyPreset(int sourcePreset, int targetPreset)
+    {
+        bool sourceIsRemote = sourcePreset == RemotePreset;
+        if (targetPreset < 0 || targetPreset >= NumPresets ||
+            (!sourceIsRemote && (sourcePreset < 0 || sourcePreset >= NumPresets)) ||
+            (sourceIsRemote && !HasRemotePreset) ||
+            (!sourceIsRemote && sourcePreset == targetPreset) ||
+            IsRemotePreset || AmongUsClient.Instance == null ||
+            !AmongUsClient.Instance.AmHost || !GameStates.IsLobby) return false;
+
+        int activePreset = CurrentPreset;
+        var sourceValues = AllOptions
+            .Where(option => option.Id != PresetId && (sourceIsRemote || !option.IsSingleValue))
+            .Select(option => (Option: option, Value: sourceIsRemote ? option.remoteValue : option.AllValues[sourcePreset]))
+            .ToArray();
+        var previousValues = sourceValues
+            .Select(entry => (entry.Option, Value: entry.Option.IsSingleValue ? entry.Option.SingleValue : entry.Option.AllValues[targetPreset]))
+            .ToArray();
+
+        bool activeValuesChanged = false;
+        for (int i = 0; i < sourceValues.Length; i++)
+        {
+            var entry = sourceValues[i];
+            bool affectsActiveValue = entry.Option.IsSingleValue || targetPreset == activePreset;
+            int beforeValue = affectsActiveValue ? entry.Option.CurrentValue : 0;
+            if (entry.Option.IsSingleValue || targetPreset == activePreset)
+                entry.Option.SetValue(entry.Value, doSave: false, doSync: false);
+            else
+                entry.Option.AllValues[targetPreset] = entry.Value;
+            if (affectsActiveValue && entry.Option.CurrentValue != beforeValue)
+                activeValuesChanged = true;
+        }
+
+        if (!OptionSaver.TrySave())
+        {
+            for (int i = 0; i < previousValues.Length; i++)
+            {
+                var entry = previousValues[i];
+                if (entry.Option.IsSingleValue || targetPreset == activePreset)
+                    entry.Option.SetValue(entry.Value, doSave: false, doSync: false);
+                else
+                    entry.Option.AllValues[targetPreset] = entry.Value;
+            }
+            return false;
+        }
+
+        if (targetPreset == activePreset || activeValuesChanged) SyncAllOptions();
+        return true;
+    }
     public static void SyncAllOptions(int targetId = -1)
     {
         if (
@@ -301,6 +370,7 @@ public abstract class OptionItem
     }
 
     public const int NumPresets = 5;
+    public const int RemotePreset = 8;
     public const int PresetId = 0;
 }
 

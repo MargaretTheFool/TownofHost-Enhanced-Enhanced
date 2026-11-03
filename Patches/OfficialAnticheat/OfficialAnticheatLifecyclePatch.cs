@@ -37,6 +37,7 @@ internal static class OfficialAnticheatLifecyclePatch
     [HarmonyPrefix]
     private static void Disconnected()
     {
+        OptionItem.SetRemotePreset(false);
         OfficialSessionContext.Reset();
         OfficialAnticheatPolicy.Reset();
         ResetOperations();
@@ -82,6 +83,7 @@ internal static class OfficialAnticheatLifecyclePatch
     [HarmonyPrefix]
     private static void HostChanged()
     {
+        OptionItem.SetRemotePreset(false);
         OfficialSessionContext.Reset();
         ResetOperations();
     }
@@ -119,7 +121,31 @@ internal static class OfficialAnticheatLifecyclePatch
 
     [HarmonyPatch(typeof(GameStartManager), nameof(GameStartManager.FinallyBegin))]
     [HarmonyPrefix, HarmonyPriority(Priority.First)]
-    private static void BeforeHostStart() => SyncLobbyOptions();
+    private static bool BeforeHostStart(GameStartManager __instance)
+    {
+        SyncLobbyOptions();
+        var client = AmongUsClient.Instance;
+        if (client == null || !client.AmHost ||
+            __instance.startState != GameStartManager.StartingStates.Countdown) return true;
+
+        // FinallyBegin runs after the countdown for both manual and automatic
+        // starts. Submit the final snapshot before the native start message.
+        OptionItem.SyncAllOptions();
+        CustomRpcTransport.FlushPending();
+        var queue = client.reliableMessageQueue;
+        while (queue.Count > 0)
+        {
+            int before = queue.Count;
+            client.PackAndSendQueuedMessages(queue, SendOption.Reliable, out _);
+            if (OfficialNetworkSend.Failed(client) || queue.Count >= before)
+            {
+                Logger.Error("Could not submit the final options snapshot; cancelling start.", "OptionSync");
+                __instance.ResetStartState();
+                return false;
+            }
+        }
+        return true;
+    }
 
     // Native HandleMessage sets Started before constructing CoStartGame. Read
     // the canonical lobby options at that boundary, while they are still lobby

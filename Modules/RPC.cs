@@ -1,4 +1,4 @@
-﻿using AmongUs.GameOptions;
+using AmongUs.GameOptions;
 using Hazel;
 using InnerNet;
 using System;
@@ -130,6 +130,7 @@ enum CustomRPC : uint
     DoubleAgentPlant,
     AntiBlackoutBuffer,
     SyncWorkhorseTasks,
+    RequestOptionChunks,
 }
 public enum Sounds
 {
@@ -163,6 +164,7 @@ internal class RPCHandlerPatch
     public static bool TrustedRpc(uint id)
     => (CustomRPC)id is CustomRPC.VersionCheck
         or CustomRPC.RequestRetryVersionCheck
+        or CustomRPC.RequestOptionChunks
         or CustomRPC.ProtocolCapabilities
         or CustomRPC.AntiBlackout
         or CustomRPC.Judge
@@ -350,35 +352,41 @@ internal class RPCHandlerPatch
                 break;
 
             case CustomRPC.VersionCheck:
+                var verifiedClientId = -1;
                 try
                 {
                     Version version = Version.Parse(reader.ReadString());
                     string tag = reader.ReadString();
                     string forkId = reader.ReadString();
                     bool cheating = reader.ReadBoolean();
-                    if (__instance.GetClientId() < 0)
+                    var joiningClientId = __instance.GetClientId();
+                    if (joiningClientId < 0)
                         break;
 
-                    if (!Main.playerVersion.TryGetValue(__instance.GetClientId(), out _))
+                    bool hadVersion = Main.playerVersion.ContainsKey(joiningClientId);
+                    bool wasVersionMatched = hadVersion && IsVersionMatch(joiningClientId);
+                    if (!hadVersion)
                     {
                         RPC.RpcVersionCheck();
                     }
 
-                    Main.playerVersion[__instance.GetClientId()] = new PlayerVersion(version, tag, forkId);
+                    Main.playerVersion[joiningClientId] = new PlayerVersion(version, tag, forkId);
 
-                    if (Main.VersionCheat.Value && __instance.GetClientId() == AmongUsClient.Instance.HostId) RPC.RpcVersionCheck();
+                    if (Main.VersionCheat.Value && joiningClientId == AmongUsClient.Instance.HostId) RPC.RpcVersionCheck();
 
-                    if (__instance.GetClientId() == Main.HostClientId && cheating)
+                    if (joiningClientId == Main.HostClientId && cheating)
                         Main.IsHostVersionCheating = true;
 
                     if (Main.VersionCheat.Value && AmongUsClient.Instance.AmHost)
-                        Main.playerVersion[__instance.GetClientId()] = Main.playerVersion[AmongUsClient.Instance.HostId];
+                        Main.playerVersion[joiningClientId] = Main.playerVersion[AmongUsClient.Instance.HostId];
 
                     // Kick Unmached Player Start
                     if (AmongUsClient.Instance.AmHost)
                     {
-                        if (!IsVersionMatch(__instance.GetClientId()) && !Main.VersionCheat.Value)
+                        if (!IsVersionMatch(joiningClientId))
                             ScheduleVersionMismatchKick(__instance);
+                        else if (!wasVersionMatched)
+                            verifiedClientId = joiningClientId;
                     }
                     // Kick Unmached Player End
                 }
@@ -396,6 +404,7 @@ internal class RPCHandlerPatch
                         CustomRpcTransport.Finish(writer);
                     }, 1f, "Retry Version Check Task");
                 }
+                if (verifiedClientId >= 0) OptionItem.SyncAllOptions(verifiedClientId);
                 break;
 
             case CustomRPC.RequestRetryVersionCheck:
@@ -407,37 +416,13 @@ internal class RPCHandlerPatch
                 break;
 
             case CustomRPC.SyncCustomSettings:
-                if (AmongUsClient.Instance.AmHost) break;
+                if (isLocalRecipient) OptionSync.Receive(reader);
+                break;
 
-                List<OptionItem> listOptions = [];
-                List<OptionItem> allOptionsList = [.. OptionItem.AllOptions];
-
-                var startAmount = reader.ReadPackedInt32();
-                var lastAmount = reader.ReadPackedInt32();
-
-                var countAllOptions = OptionItem.AllOptions.Count;
-
-                // Add Options
-                for (var option = startAmount; option < countAllOptions && option <= lastAmount; option++)
-                {
-                    listOptions.Add(allOptionsList[option]);
-                }
-
-                var countOptions = listOptions.Count;
-                Logger.Msg($"StartAmount/LastAmount: {startAmount}/{lastAmount} :--: ListOptionsCount/AllOptions: {countOptions}/{countAllOptions}", "CustomRPC.SyncCustomSettings");
-
-                // Sync Settings
-                foreach (var option in listOptions.ToArray())
-                {
-                    // Set Value Options
-                    option.SetValue(reader.ReadPackedInt32());
-
-                    // Set Preset 5 for modded non-host players
-                    if (startAmount == 0 && option.Name == "Preset" && option.CurrentValue != 4)
-                    {
-                        option.SetValue(4); // 4 => Preset 5
-                    }
-                }
+            case CustomRPC.RequestOptionChunks:
+                if (isLocalRecipient && AmongUsClient.Instance.AmHost && __instance.OwnerId != AmongUsClient.Instance.HostId &&
+                    Main.playerVersion.ContainsKey(__instance.OwnerId) && IsVersionMatch(__instance.OwnerId))
+                    OptionSync.ReceiveRequest(__instance, reader);
                 break;
 
             case CustomRPC.RemoveSubRole:
@@ -893,89 +878,9 @@ internal class PlayerPhysicsRPCHandlerPatch
 
 internal static class RPC
 {
-    //SyncCustomSettingsRPC Sender
-    public static void SyncCustomSettingsRPC(int targetId = -1)
-    {
-        if (targetId != -1)
-        {
-            var client = Utils.GetClientById(targetId);
-            if (client == null || client.Character == null || !Main.playerVersion.ContainsKey(client.Id))
-            {
-                return;
-            }
-        }
-        else if (!Main.AllPlayerControls.Any(pc => pc.IsNonHostModdedClient()))
-        {
-            return;
-        }
+    public static void SyncCustomSettingsRPC(int targetId = -1) => OptionSync.SendAll(targetId);
 
-        if (!AmongUsClient.Instance.AmHost || PlayerControl.AllPlayerControls.Count <= 1 || (AmongUsClient.Instance.AmHost == false && PlayerControl.LocalPlayer == null))
-        {
-            return;
-        }
-
-        var amount = OptionItem.AllOptions.Count;
-        if (OfficialAnticheatPolicy.Enabled)
-        {
-            // At most 32 five-byte values plus both packed indices fit inside
-            // one 200-byte RPC child even with a five-byte sender NetId.
-            for (int start = 0; start < amount; start += 32)
-                SyncOptionsBetween(start, Math.Min(start + 31, amount - 1), amount, targetId);
-            return;
-        }
-        int divideBy = amount / 10;
-
-        for (var i = 0; i <= 10; i++)
-        {
-            SyncOptionsBetween(i * divideBy, (i + 1) * divideBy, amount, targetId);
-        }
-    }
-
-    static void SyncOptionsBetween(int startAmount, int lastAmount, int amountAllOptions, int targetId = -1)
-    {
-        if (targetId != -1)
-        {
-            var client = Utils.GetClientById(targetId);
-            if (client == null || client.Character == null || !Main.playerVersion.ContainsKey(client.Id))
-            {
-                return;
-            }
-        }
-        else if (!Main.AllPlayerControls.Any(pc => pc.IsNonHostModdedClient()))
-        {
-            return;
-        }
-
-        if (!AmongUsClient.Instance.AmHost || PlayerControl.AllPlayerControls.Count <= 1 || (AmongUsClient.Instance.AmHost == false && PlayerControl.LocalPlayer == null))
-        {
-            return;
-        }
-
-        if (amountAllOptions != OptionItem.AllOptions.Count)
-        {
-            amountAllOptions = OptionItem.AllOptions.Count;
-        }
-
-        List<OptionItem> listOptions = [];
-        List<OptionItem> allOptionsList = [.. OptionItem.AllOptions];
-
-        // Add Options
-        for (var option = startAmount; option < amountAllOptions && option <= lastAmount; option++)
-        {
-            listOptions.Add(allOptionsList[option]);
-        }
-
-        var countListOptions = listOptions.Count;
-        //Logger.Msg($"StartAmount/LastAmount: {startAmount}/{lastAmount} :--: ListOptionsCount/AllOptions: {countListOptions}/{amountAllOptions}", "SyncOptionsBetween");
-
-        // Sync Settings
-        CustomRpcTransport.SendPayload(CustomRPC.SyncCustomSettings, writer =>
-        {
-            writer.WritePacked(startAmount);
-            writer.WritePacked(lastAmount);
-            foreach (var option in listOptions.ToArray()) writer.WritePacked(option.GetValue());
-        }, targetId);
-    }
+    public static void SyncCustomSettingRPC(OptionItem option) => OptionSync.SendOne(option);
 
     public static void PlaySoundRPC(byte PlayerID, Sounds sound)
     {

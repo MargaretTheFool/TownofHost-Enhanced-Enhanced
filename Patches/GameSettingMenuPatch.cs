@@ -134,6 +134,10 @@ public class GameSettingMenuPatch
     public static StringOption PresetBehaviour;
     private static GameObject PresetSelectorRoot;
     private static TextMeshPro PresetLabel;
+    private static PassiveButton RemotePresetCopyButton;
+    private static TextMeshPro RemotePresetCopyLabel;
+    private static GameObject RemotePresetCopyDialog;
+    private static Sprite SolidSprite;
     public static FreeChatInputField InputField;
     public static List<OptionItem> HiddenBySearch = [];
     public static Action _SearchForOptions;
@@ -144,7 +148,9 @@ public class GameSettingMenuPatch
 
         // The sidebar label is outside the settings scroller's stencil mask.
         var valueTemplate = __instance.GamePresetsButton.GetComponentInChildren<TextMeshPro>(true);
-        var presetBackground = CreatePresetSelector(__instance, valueTemplate);
+        var readableFont = Resources.FindObjectsOfTypeAll<TMP_FontAsset>()
+            .FirstOrDefault(font => font.name == "Barlow-SemiBold SDF") ?? valueTemplate.font;
+        var presetBackground = CreatePresetSelector(__instance, valueTemplate, readableFont);
 
         var GameSettingsLabel = __instance.GameSettingsButton.transform.parent.parent.FindChild("GameSettingsLabel").GetComponent<TextMeshPro>();
         GameSettingsLabel.DestroyTranslator();
@@ -155,16 +161,19 @@ public class GameSettingMenuPatch
         TextField.transform.localScale = new Vector3(0.3f, 0.59f, 1);
         TextField.transform.localPosition = new Vector3(-2.07f, -2.57f, -5f);
         TextField.textArea.outputText.transform.localScale = new Vector3(3.5f, 2f, 1f);
-        TextField.textArea.outputText.font = valueTemplate.font;
+        TextField.textArea.outputText.font = readableFont;
         TextField.name = "InputField";
 
-        // Both controls share a row, but the search field belongs to a different
-        // parent. Align their rendered bounds in world space to avoid overlap.
+        // The copy action sits between the preset selector and search field.
+        // Align all rendered bounds in world space to avoid overlap.
         var searchBounds = TextField.Background.bounds;
         var presetBounds = presetBackground.bounds;
+        var copyCollider = RemotePresetCopyButton.GetComponent<BoxCollider2D>();
+        float copyRight = RemotePresetCopyButton.transform.position.x
+            + RemotePresetCopyButton.transform.TransformVector(new Vector3(copyCollider.size.x / 2f, 0f, 0f)).magnitude;
         float gap = ParentLeftPanel.TransformVector(new Vector3(0.12f, 0f, 0f)).magnitude;
         TextField.transform.position += new Vector3(
-            presetBounds.max.x + gap - searchBounds.min.x,
+            copyRight + gap - searchBounds.min.x,
             presetBounds.center.y - searchBounds.center.y, 0f);
         InputField = TextField;
 
@@ -196,6 +205,8 @@ public class GameSettingMenuPatch
                 {
                     SearchForOptions(TextField);
                 }));
+
+        RefreshRemotePresetCopyButton();
 
         _SearchForOptions = (() =>
         {
@@ -229,7 +240,7 @@ public class GameSettingMenuPatch
         }
     }
 
-    private static SpriteRenderer CreatePresetSelector(GameSettingMenu menu, TextMeshPro textTemplate)
+    private static SpriteRenderer CreatePresetSelector(GameSettingMenu menu, TextMeshPro textTemplate, TMP_FontAsset readableFont)
     {
         var parent = menu.GamePresetsButton.transform.parent;
         // Measure the two columns rather than carrying coordinates/scales from
@@ -274,16 +285,59 @@ public class GameSettingMenuPatch
         background.size = new Vector2(width, height);
 
         PresetLabel = Object.Instantiate(textTemplate, root.transform);
-        ConfigurePresetText(PresetLabel, GetString($"Preset_{OptionItem.CurrentPreset + 1}"),
-            new Vector2(width - 2f * arrowWidth - 0.16f, height), 2.8f);
-        PresetLabel.color = new Color32(211, 234, 234, 255);
+        ConfigurePresetText(PresetLabel, OptionItem.FastOptions[OptionItem.PresetId].GetString(),
+            new Vector2(width - 2f * arrowWidth - 0.16f, height), 2.4f);
+        PresetLabel.font = readableFont;
+        PresetLabel.fontSharedMaterial = readableFont.material;
+        PresetLabel.fontStyle = FontStyles.Normal;
+        PresetLabel.color = Color.white;
         PresetLabel.outlineWidth = 0.05f;
         PresetLabel.enableAutoSizing = true;
-        PresetLabel.fontSizeMin = 2.2f;
+        PresetLabel.fontSizeMin = 1.8f;
         CenterPresetText(PresetLabel);
 
         CreateArrow(-1);
         CreateArrow(1);
+
+        var copyButton = Object.Instantiate(menu.GameSettingsButton, root.transform);
+        RemotePresetCopyButton = copyButton;
+        copyButton.name = "CopyLastHostSettings";
+        foreach (var anchor in copyButton.GetComponentsInChildren<AspectPosition>(true))
+        {
+            anchor.enabled = false;
+            Object.Destroy(anchor);
+        }
+        copyButton.transform.localScale = Vector3.one;
+        copyButton.transform.localPosition = new Vector3(width / 2f + 0.56f, 0f, -1f);
+        var copyCollider = copyButton.GetComponent<BoxCollider2D>();
+        copyCollider.offset = Vector2.zero;
+        copyCollider.size = new Vector2(1f, height);
+        CenterClonedButtonContents(copyButton);
+        foreach (var state in new[] { copyButton.inactiveSprites, copyButton.activeSprites,
+            copyButton.selectedSprites, copyButton.selectedInactiveSprites, copyButton.disabledSprites,
+            copyButton.onClickSprites })
+        {
+            var sprite = state ? state.GetComponentInChildren<SpriteRenderer>(true) : null;
+            if (sprite == null) continue;
+            sprite.drawMode = SpriteDrawMode.Sliced;
+            sprite.size = new Vector2(1f, height);
+        }
+        RemotePresetCopyLabel = copyButton.GetComponentInChildren<TextMeshPro>(true);
+        ConfigurePresetText(RemotePresetCopyLabel, GetString("RemotePresetCopyUnavailable"),
+            new Vector2(0.9f, 0.42f), 2.4f);
+        RemotePresetCopyLabel.font = readableFont;
+        RemotePresetCopyLabel.fontSharedMaterial = readableFont.material;
+        RemotePresetCopyLabel.fontStyle = FontStyles.Normal;
+        RemotePresetCopyLabel.color = Color.white;
+        RemotePresetCopyLabel.enableAutoSizing = true;
+        RemotePresetCopyLabel.fontSizeMin = 1.5f;
+        RemotePresetCopyLabel.fontSizeMax = 2.4f;
+        copyButton.OnClick = new();
+        copyButton.OnClick.AddListener((UnityEngine.Events.UnityAction)(() =>
+            ShowPresetCopySource(menu)));
+        copyButton.SetButtonEnableState(false);
+        copyButton.gameObject.SetActive(true);
+        menu.ControllerSelectable.Add(copyButton);
         return background;
 
         void CreateArrow(int direction)
@@ -305,6 +359,21 @@ public class GameSettingMenuPatch
             button.OnClick.AddListener((UnityEngine.Events.UnityAction)(() => ChangePreset(menu, direction)));
             button.gameObject.SetActive(GameOptionsMenuPatch.CanEdit);
             if (GameOptionsMenuPatch.CanEdit) menu.ControllerSelectable.Add(button);
+        }
+    }
+
+    private static void CenterClonedButtonContents(PassiveButton button)
+    {
+        var label = button.GetComponentInChildren<TextMeshPro>(true);
+        var labelParent = label.transform.parent;
+        labelParent.localPosition = new Vector3(0f, 0f, labelParent.localPosition.z);
+        foreach (var state in new[] { button.inactiveSprites, button.activeSprites,
+            button.selectedSprites, button.selectedInactiveSprites, button.disabledSprites,
+            button.onClickSprites })
+        {
+            if (!state) continue;
+            var transform = state.transform;
+            transform.localPosition = new Vector3(0f, 0f, transform.localPosition.z);
         }
     }
 
@@ -366,6 +435,300 @@ public class GameSettingMenuPatch
             CenterPresetText(PresetLabel);
         }
         if (InputField != null) InputField.Clear();
+    }
+
+    private static bool CanCopyPreset()
+        => GameOptionsMenuPatch.CanEdit && GameStates.IsLobby && !OptionItem.IsRemotePreset;
+
+    private static void RefreshRemotePresetCopyButton()
+    {
+        if (RemotePresetCopyButton == null) return;
+
+        bool canCopy = CanCopyPreset();
+        RemotePresetCopyButton.SetButtonEnableState(canCopy);
+        RemotePresetCopyLabel.text = canCopy
+            ? GetString("RemotePresetCopyButton")
+            : !GameOptionsMenuPatch.CanEdit ? GetString("RemotePresetCopyHostOnly")
+            : !GameStates.IsLobby ? GetString("RemotePresetCopyLobbyOnly")
+            : OptionItem.IsRemotePreset ? GetString("RemotePresetCopySelectLocal")
+            : GetString("RemotePresetCopyUnavailable");
+        CenterPresetText(RemotePresetCopyLabel);
+    }
+
+    private static void ShowPresetCopySource(GameSettingMenu menu)
+    {
+        RefreshRemotePresetCopyButton();
+        if (menu == null || !menu.isActiveAndEnabled || !CanCopyPreset()) return;
+
+        var root = CreatePresetCopyDialog(menu);
+        CreatePresetCopyText(menu, root, "Title", GetString("PresetCopyChooseSource"),
+            new Vector3(0f, 1.15f, -1f), new Vector2(5.2f, 0.5f), 2.3f);
+        CreatePresetCopyButton(menu, root, "PreviousHost", GetString("PresetCopyPreviousHostChoice"),
+            new Vector3(0f, 0.46f, -2f), new Vector2(4.9f, 0.55f), OptionItem.HasRemotePreset,
+            () => ShowPresetCopySelection(menu, OptionItem.RemotePreset, OptionItem.CurrentPreset));
+        CreatePresetCopyButton(menu, root, "LocalPresets", GetString("PresetCopyLocalChoice"),
+            new Vector3(0f, -0.29f, -2f), new Vector2(4.9f, 0.55f), true,
+            () => ShowPresetCopySelection(menu, OptionItem.CurrentPreset, OptionItem.CurrentPreset));
+        CreatePresetCopyButton(menu, root, "Cancel", GetString("Cancel"),
+            new Vector3(0f, -1.2f, -2f), new Vector2(1.6f, 0.5f), true, CloseRemotePresetCopyConfirmation);
+    }
+
+    private static void ShowPresetCopySelection(GameSettingMenu menu, int sourcePreset, int targetPreset)
+    {
+        if (menu == null || !menu.isActiveAndEnabled || !CanCopyPreset()) return;
+
+        bool fromHost = sourcePreset == OptionItem.RemotePreset;
+        if (fromHost && !OptionItem.HasRemotePreset) return;
+
+        var root = CreatePresetCopyDialog(menu);
+        CreatePresetCopyText(menu, root, "Title", GetString("PresetCopySelectSlots"),
+            new Vector3(0f, 1.15f, -1f), new Vector2(5.2f, 0.5f), 2.3f);
+        CreatePresetCopyText(menu, root, "SourceLabel", GetString("PresetCopySource"),
+            new Vector3(-1.65f, 0.48f, -1f), new Vector2(1.8f, 0.48f), 2.1f);
+        CreatePresetCopyText(menu, root, "SourceValue",
+            fromHost ? GetString("PresetCopyPreviousHost") : GetPresetCopyName(sourcePreset),
+            new Vector3(0.62f, 0.48f, -1f), new Vector2(2.3f, 0.48f), 2.1f);
+        CreatePresetCopyText(menu, root, "TargetLabel", GetString("PresetCopyTarget"),
+            new Vector3(-1.65f, -0.23f, -1f), new Vector2(1.8f, 0.48f), 2.1f);
+        CreatePresetCopyText(menu, root, "TargetValue", GetPresetCopyName(targetPreset),
+            new Vector3(0.62f, -0.23f, -1f), new Vector2(1.7f, 0.48f), 2.1f);
+
+        if (!fromHost)
+        {
+            CreatePresetCopyButton(menu, root, "SourcePrevious", "−",
+                new Vector3(-0.58f, 0.48f, -2f), new Vector2(0.48f, 0.48f), true,
+                () => ShowPresetCopySelection(menu, (sourcePreset + OptionItem.NumPresets - 1) % OptionItem.NumPresets, targetPreset));
+            CreatePresetCopyButton(menu, root, "SourceNext", "+",
+                new Vector3(1.82f, 0.48f, -2f), new Vector2(0.48f, 0.48f), true,
+                () => ShowPresetCopySelection(menu, (sourcePreset + 1) % OptionItem.NumPresets, targetPreset));
+        }
+        CreatePresetCopyButton(menu, root, "TargetPrevious", "−",
+            new Vector3(-0.58f, -0.23f, -2f), new Vector2(0.48f, 0.48f), true,
+            () => ShowPresetCopySelection(menu, sourcePreset, (targetPreset + OptionItem.NumPresets - 1) % OptionItem.NumPresets));
+        CreatePresetCopyButton(menu, root, "TargetNext", "+",
+            new Vector3(1.82f, -0.23f, -2f), new Vector2(0.48f, 0.48f), true,
+            () => ShowPresetCopySelection(menu, sourcePreset, (targetPreset + 1) % OptionItem.NumPresets));
+
+        bool canContinue = fromHost || sourcePreset != targetPreset;
+        if (!canContinue)
+            CreatePresetCopyText(menu, root, "SamePreset", GetString("PresetCopySamePreset"),
+                new Vector3(0f, -0.8f, -1f), new Vector2(5.1f, 0.36f), 1.7f);
+        CreatePresetCopyButton(menu, root, "Back", GetString("Back"),
+            new Vector3(-1.85f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true, () => ShowPresetCopySource(menu));
+        CreatePresetCopyButton(menu, root, "Next", GetString("PresetCopyNext"),
+            new Vector3(0f, -1.27f, -2f), new Vector2(1.5f, 0.5f), canContinue,
+            () => ShowPresetCopyConfirmation(menu, sourcePreset, targetPreset));
+        CreatePresetCopyButton(menu, root, "Cancel", GetString("Cancel"),
+            new Vector3(1.85f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true, CloseRemotePresetCopyConfirmation);
+    }
+
+    private static void ShowPresetCopyConfirmation(GameSettingMenu menu, int sourcePreset, int targetPreset)
+    {
+        if (menu == null || !menu.isActiveAndEnabled || !CanCopyPreset()) return;
+
+        bool fromHost = sourcePreset == OptionItem.RemotePreset;
+        if ((fromHost && !OptionItem.HasRemotePreset) || sourcePreset == targetPreset) return;
+
+        string sourceName = fromHost ? GetString("PresetCopyPreviousHost") : GetPresetCopyName(sourcePreset);
+        string targetName = GetPresetCopyName(targetPreset);
+        string prompt = string.Format(GetString(fromHost ? "PresetCopyRemoteConfirm" : "PresetCopyLocalConfirm"),
+            sourceName, targetName);
+        var root = CreatePresetCopyDialog(menu);
+        CreatePresetCopyText(menu, root, "Message", prompt,
+            new Vector3(0f, 0.3f, -1f), new Vector2(5.3f, 1.65f), 2.15f);
+        CreatePresetCopyButton(menu, root, "Back", GetString("Back"),
+            new Vector3(-1.85f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true,
+            () => ShowPresetCopySelection(menu, sourcePreset, targetPreset));
+        CreatePresetCopyButton(menu, root, "Confirm", GetString("RemotePresetCopyConfirmButton"),
+            new Vector3(0f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true,
+            () => ConfirmPresetCopy(menu, sourcePreset, targetPreset));
+        CreatePresetCopyButton(menu, root, "Cancel", GetString("Cancel"),
+            new Vector3(1.85f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true, CloseRemotePresetCopyConfirmation);
+    }
+
+    private static string GetPresetCopyName(int preset)
+    {
+        var name = preset switch
+        {
+            0 => Main.Preset1,
+            1 => Main.Preset2,
+            2 => Main.Preset3,
+            3 => Main.Preset4,
+            _ => Main.Preset5,
+        };
+        return name.Value == (string)name.DefaultValue ? GetString($"Preset_{preset + 1}") : name.Value;
+    }
+
+    private static GameObject CreatePresetCopyDialog(GameSettingMenu menu)
+    {
+        CloseRemotePresetCopyConfirmation();
+        var root = new GameObject("PresetCopyDialog");
+        RemotePresetCopyDialog = root;
+        root.layer = menu.gameObject.layer;
+        root.transform.SetParent(menu.transform, false);
+        root.transform.localPosition = new Vector3(0f, 0f, -15f);
+
+        if (!SolidSprite)
+        {
+            var texture = Texture2D.whiteTexture;
+            SolidSprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f), 1f);
+        }
+
+        var dimObject = new GameObject("DimBackground") { layer = root.layer };
+        dimObject.transform.SetParent(root.transform, false);
+        dimObject.transform.localPosition = new Vector3(0f, 0f, 0.3f);
+        var dim = dimObject.AddComponent<SpriteRenderer>();
+        dim.sprite = SolidSprite;
+        dim.drawMode = SpriteDrawMode.Sliced;
+        dim.size = new Vector2(30f, 20f);
+        dim.color = new Color(0f, 0f, 0f, 0.6f);
+
+        var blocker = Object.Instantiate(menu.GameSettingsButton, root.transform);
+        blocker.name = "Blocker";
+        foreach (var anchor in blocker.GetComponentsInChildren<AspectPosition>(true))
+        {
+            anchor.enabled = false;
+            Object.Destroy(anchor);
+        }
+        blocker.transform.localPosition = Vector3.zero;
+        blocker.transform.localScale = Vector3.one;
+        var blockerCollider = blocker.GetComponent<BoxCollider2D>();
+        blockerCollider.offset = Vector2.zero;
+        blockerCollider.size = new Vector2(30f, 20f);
+        blocker.OnClick = new();
+        blocker.OnClick.AddListener((UnityEngine.Events.UnityAction)(() => { }));
+        blocker.SetButtonEnableState(true);
+        foreach (var sprite in blocker.GetComponentsInChildren<SpriteRenderer>(true)) sprite.enabled = false;
+        foreach (var label in blocker.GetComponentsInChildren<TextMeshPro>(true)) label.gameObject.SetActive(false);
+
+        var panelObject = new GameObject("Panel") { layer = root.layer };
+        panelObject.transform.SetParent(root.transform, false);
+        panelObject.transform.localPosition = new Vector3(0f, 0f, -1f);
+        var panel = panelObject.AddComponent<SpriteRenderer>();
+        panel.sprite = PresetSelectorVisuals.Panel;
+        panel.drawMode = SpriteDrawMode.Sliced;
+        panel.size = new Vector2(5.8f, 3.4f);
+
+        var fillObject = new GameObject("OpaqueFill") { layer = root.layer };
+        fillObject.transform.SetParent(root.transform, false);
+        fillObject.transform.localPosition = new Vector3(0f, 0f, -0.95f);
+        var fill = fillObject.AddComponent<SpriteRenderer>();
+        fill.sprite = SolidSprite;
+        fill.drawMode = SpriteDrawMode.Sliced;
+        fill.size = new Vector2(5.76f, 3.36f);
+        fill.color = new Color32(27, 37, 42, 255);
+        return root;
+    }
+
+    private static void CreatePresetCopyText(GameSettingMenu menu, GameObject root, string name,
+        string caption, Vector3 position, Vector2 size, float fontSize)
+    {
+        var label = Object.Instantiate(menu.GamePresetsButton.GetComponentInChildren<TextMeshPro>(true), root.transform);
+        label.name = name;
+        ConfigurePresetText(label, caption, size, fontSize);
+        var font = RemotePresetCopyLabel.font;
+        label.font = font;
+        label.fontSharedMaterial = font.material;
+        label.fontStyle = FontStyles.Normal;
+        label.enableWordWrapping = true;
+        label.enableAutoSizing = true;
+        label.fontSizeMin = 1.45f;
+        label.fontSizeMax = fontSize;
+        label.color = new Color32(235, 243, 243, 255);
+        label.margin = new Vector4(0.08f, 0.03f, 0.08f, 0.03f);
+        CenterPresetText(label);
+        label.transform.localPosition += position;
+    }
+
+    private static void CreatePresetCopyButton(GameSettingMenu menu, GameObject root, string name,
+        string caption, Vector3 position, Vector2 size, bool enabled, Action action)
+    {
+        var button = Object.Instantiate(menu.GameSettingsButton, root.transform);
+        button.gameObject.SetActive(true);
+        button.name = name;
+        foreach (var anchor in button.GetComponentsInChildren<AspectPosition>(true))
+        {
+            anchor.enabled = false;
+            Object.Destroy(anchor);
+        }
+        button.transform.localPosition = position;
+        button.transform.localScale = Vector3.one;
+        var collider = button.GetComponent<BoxCollider2D>();
+        collider.offset = Vector2.zero;
+        collider.size = size;
+        CenterClonedButtonContents(button);
+        foreach (var state in new[] { button.inactiveSprites, button.activeSprites,
+            button.selectedSprites, button.selectedInactiveSprites, button.disabledSprites,
+            button.onClickSprites })
+        {
+            var sprite = state ? state.GetComponentInChildren<SpriteRenderer>(true) : null;
+            if (sprite == null) continue;
+            sprite.drawMode = SpriteDrawMode.Sliced;
+            sprite.size = size;
+        }
+        var label = button.GetComponentInChildren<TextMeshPro>(true);
+        ConfigurePresetText(label, caption, new Vector2(size.x - 0.12f, size.y - 0.04f), 2.1f);
+        var font = RemotePresetCopyLabel.font;
+        label.font = font;
+        label.fontSharedMaterial = font.material;
+        label.fontStyle = FontStyles.Normal;
+        label.color = Color.white;
+        label.enableAutoSizing = true;
+        label.fontSizeMin = 1.45f;
+        label.fontSizeMax = 2.1f;
+        CenterPresetText(label);
+        button.OnClick = new();
+        if (enabled) button.OnClick.AddListener((UnityEngine.Events.UnityAction)(() => action()));
+        button.SetButtonEnableState(true);
+        if (!enabled)
+        {
+            collider.enabled = false;
+            foreach (var sprite in button.GetComponentsInChildren<SpriteRenderer>(true))
+                sprite.color = new Color32(80, 84, 85, 255);
+            label.color = new Color32(157, 161, 161, 255);
+        }
+    }
+
+    private static void ConfirmPresetCopy(GameSettingMenu menu, int sourcePreset, int targetPreset)
+    {
+        CloseRemotePresetCopyConfirmation();
+        RefreshRemotePresetCopyButton();
+        if (menu == null || !menu.isActiveAndEnabled || !CanCopyPreset()) return;
+
+        var previousMode = Options.CurrentGameMode;
+        if (!OptionItem.CopyPreset(sourcePreset, targetPreset))
+        {
+            HudManager.Instance?.ShowPopUp(GetString("RemotePresetCopyFailed"));
+            return;
+        }
+
+        if (previousMode != Options.CurrentGameMode)
+        {
+            GameOptionsMenuPatch.ReOpenSettings(1);
+            return;
+        }
+        foreach (var tab in ModSettingsTabs.Values)
+        {
+            if (tab == null || tab.Children == null) continue;
+            foreach (var child in tab.Children.ToArray())
+                if (child != null) child.Initialize();
+            GameOptionsMenuPatch.ReCreateSettings(tab);
+        }
+        if (PresetLabel != null && OptionItem.FastOptions.TryGetValue(OptionItem.PresetId, out var presetOption))
+        {
+            PresetLabel.text = presetOption.GetString();
+            CenterPresetText(PresetLabel);
+        }
+        if (InputField != null) InputField.Clear();
+        RefreshRemotePresetCopyButton();
+    }
+    private static void CloseRemotePresetCopyConfirmation()
+    {
+        if (RemotePresetCopyDialog == null) return;
+        RemotePresetCopyDialog.SetActive(false);
+        Object.Destroy(RemotePresetCopyDialog);
+        RemotePresetCopyDialog = null;
     }
 
     [HarmonyPatch(nameof(GameSettingMenu.ChangeTab)), HarmonyPrefix]
@@ -544,6 +907,9 @@ public class GameSettingMenuPatch
             Object.Destroy(PresetSelectorRoot);
         }
         PresetSelectorRoot = null;
+        CloseRemotePresetCopyConfirmation();
+        RemotePresetCopyButton = null;
+        RemotePresetCopyLabel = null;
         if (InputField != null)
         {
             InputField.gameObject.SetActive(false);
@@ -607,7 +973,6 @@ public class RpcSyncSettingsPatch
             GameManager.Instance && GameManager.Instance.LogicOptions != null)
         {
             GameManager.Instance.LogicOptions.SetDirty();
-            OptionItem.SyncAllOptions();
         }
         return false;
     }

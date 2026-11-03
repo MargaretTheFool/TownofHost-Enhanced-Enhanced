@@ -13,10 +13,12 @@ public class PresetOptionItem(int defaultValue, TabGroup tab, bool vanilla) : Op
     }
 
     // Getter
-    public override int GetInt() => Rule.GetValueByIndex(CurrentValue);
-    public override float GetFloat() => Rule.GetValueByIndex(CurrentValue);
+    public override int GetInt() => IsRemotePreset ? RemotePreset : Rule.GetValueByIndex(CurrentValue);
+    public override float GetFloat() => IsRemotePreset ? RemotePreset : Rule.GetValueByIndex(CurrentValue);
     public override string GetString()
     {
+        if (IsRemotePreset) return Translator.GetString("Preset") + " 9";
+
         return CurrentValue switch
         {
             0 => Main.Preset1.Value == (string)Main.Preset1.DefaultValue ? Translator.GetString("Preset_1") : Main.Preset1.Value,
@@ -28,7 +30,7 @@ public class PresetOptionItem(int defaultValue, TabGroup tab, bool vanilla) : Op
         };
     }
     public override int GetValue()
-        => Rule.RepeatIndex(base.GetValue());
+        => IsRemotePreset ? RemotePreset : Rule.RepeatIndex(base.GetValue());
 
     // Setter
     public override void SetValue(int value, bool doSync = true)

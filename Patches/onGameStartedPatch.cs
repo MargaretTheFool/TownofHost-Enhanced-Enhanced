@@ -188,7 +188,6 @@ internal class ChangeRoleSettings
             Main.VisibleTasksCount = true;
             if (__instance.AmHost)
             {
-                RPC.SyncCustomSettingsRPC();
                 Main.RefixCooldownDelay = 0;
             }
 

@@ -230,7 +230,7 @@ public class GameStartManagerPatch
                 __instance.GameStartText.transform.localPosition = GameStartTextlocalPosition;
             }
 
-            __instance.RulesPresetText.text = GetString($"Preset_{OptionItem.CurrentPreset + 1}");
+            __instance.RulesPresetText.text = OptionItem.FastOptions[OptionItem.PresetId].GetString();
 
             // Lobby timer
             if (!GameData.Instance || AmongUsClient.Instance.NetworkMode == NetworkModes.LocalGame || !GameStates.IsVanillaServer) return;

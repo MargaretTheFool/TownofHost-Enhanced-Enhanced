@@ -2,7 +2,7 @@ namespace TOHE;
 
 internal static class RpcCompatibility
 {
-    private const byte ProtocolVersion = 2;
+    private const byte ProtocolVersion = 3;
     private static readonly Dictionary<int, int> PackedClients = new();
     private static readonly HashSet<int> IncompatibleClients = new();
     private static bool declared;
