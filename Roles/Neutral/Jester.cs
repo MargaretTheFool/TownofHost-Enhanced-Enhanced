@@ -41,7 +41,7 @@ internal class Jester : RoleBase
         MeetingsNeededForWin = IntegerOptionItem.Create(Id + 6, "MeetingsNeededForWin", new(0, 10, 1), 0, TabGroup.NeutralRoles, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Jester])
             .SetValueFormat(OptionFormat.Times);
-        RevealJesterUponEjection = BooleanOptionItem.Create(Id + 8, "Jester_RevealUponEject", true, TabGroup.NeutralRoles, true)
+        RevealJesterUponEjection = BooleanOptionItem.Create(Id + 8, "Jester_RevealUponEject", true, TabGroup.NeutralRoles, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Jester]);
         SunnyboyChance = IntegerOptionItem.Create(Id + 7, "SunnyboyChance", new(0, 100, 5), 0, TabGroup.NeutralRoles, false)
             .SetParent(CustomRoleSpawnChances[CustomRoles.Jester])

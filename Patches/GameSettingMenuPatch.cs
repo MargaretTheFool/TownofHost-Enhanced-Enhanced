@@ -531,8 +531,9 @@ public class GameSettingMenuPatch
 
         string sourceName = fromHost ? GetString("PresetCopyPreviousHost") : GetPresetCopyName(sourcePreset);
         string targetName = GetPresetCopyName(targetPreset);
-        string prompt = string.Format(GetString(fromHost ? "PresetCopyRemoteConfirm" : "PresetCopyLocalConfirm"),
-            sourceName, targetName);
+        string impactKey = targetPreset == OptionItem.CurrentPreset ? "PresetCopyAffectsCurrent" : "PresetCopyKeepsCurrent";
+        string prompt = string.Format(GetString("PresetCopyConfirm"), sourceName, targetName)
+            + "\n" + GetString(impactKey);
         var root = CreatePresetCopyDialog(menu);
         CreatePresetCopyText(menu, root, "Message", prompt,
             new Vector3(0f, 0.3f, -1f), new Vector2(5.3f, 1.65f), 2.15f);

@@ -65,9 +65,16 @@ public static class OptionSaver
         {
             var id = singleOption.Key;
             var value = singleOption.Value;
-            if (OptionItem.FastOptions.TryGetValue(id, out var optionItem) && optionItem.IsSingleValue)
+            if (OptionItem.FastOptions.TryGetValue(id, out var optionItem))
             {
-                optionItem.SetValue(value, doSave: false, doSync: false);
+                if (optionItem.IsSingleValue)
+                {
+                    optionItem.SetValue(value, doSave: false, doSync: false);
+                }
+                else if (!presetOptions.ContainsKey(id))
+                {
+                    optionItem.SetAllValues(Enumerable.Repeat(value, OptionItem.NumPresets).ToArray());
+                }
             }
         }
         foreach (var presetOption in presetOptions)

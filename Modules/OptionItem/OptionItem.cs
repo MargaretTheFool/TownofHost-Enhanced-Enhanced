@@ -298,25 +298,20 @@ public abstract class OptionItem
 
         int activePreset = CurrentPreset;
         var sourceValues = AllOptions
-            .Where(option => option.Id != PresetId && (sourceIsRemote || !option.IsSingleValue))
+            .Where(option => option.Id != PresetId && !option.IsSingleValue)
             .Select(option => (Option: option, Value: sourceIsRemote ? option.remoteValue : option.AllValues[sourcePreset]))
             .ToArray();
         var previousValues = sourceValues
-            .Select(entry => (entry.Option, Value: entry.Option.IsSingleValue ? entry.Option.SingleValue : entry.Option.AllValues[targetPreset]))
+            .Select(entry => (entry.Option, Value: entry.Option.AllValues[targetPreset]))
             .ToArray();
 
-        bool activeValuesChanged = false;
         for (int i = 0; i < sourceValues.Length; i++)
         {
             var entry = sourceValues[i];
-            bool affectsActiveValue = entry.Option.IsSingleValue || targetPreset == activePreset;
-            int beforeValue = affectsActiveValue ? entry.Option.CurrentValue : 0;
-            if (entry.Option.IsSingleValue || targetPreset == activePreset)
+            if (targetPreset == activePreset)
                 entry.Option.SetValue(entry.Value, doSave: false, doSync: false);
             else
                 entry.Option.AllValues[targetPreset] = entry.Value;
-            if (affectsActiveValue && entry.Option.CurrentValue != beforeValue)
-                activeValuesChanged = true;
         }
 
         if (!OptionSaver.TrySave())
@@ -324,7 +319,7 @@ public abstract class OptionItem
             for (int i = 0; i < previousValues.Length; i++)
             {
                 var entry = previousValues[i];
-                if (entry.Option.IsSingleValue || targetPreset == activePreset)
+                if (targetPreset == activePreset)
                     entry.Option.SetValue(entry.Value, doSave: false, doSync: false);
                 else
                     entry.Option.AllValues[targetPreset] = entry.Value;
@@ -332,7 +327,7 @@ public abstract class OptionItem
             return false;
         }
 
-        if (targetPreset == activePreset || activeValuesChanged) SyncAllOptions();
+        if (targetPreset == activePreset) SyncAllOptions();
         return true;
     }
     public static void SyncAllOptions(int targetId = -1)
