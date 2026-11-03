@@ -115,6 +115,9 @@ public class Main : BasePlugin
     public static ConfigEntry<string> Preset3 { get; private set; }
     public static ConfigEntry<string> Preset4 { get; private set; }
     public static ConfigEntry<string> Preset5 { get; private set; }
+    public static ConfigEntry<string> Preset6 { get; private set; }
+    public static ConfigEntry<string> Preset7 { get; private set; }
+    public static ConfigEntry<string> Preset8 { get; private set; }
     //Other Configs
     public static ConfigEntry<string> WebhookURL { get; private set; }
     public static ConfigEntry<string> BetaBuildURL { get; private set; }
@@ -575,6 +578,9 @@ public class Main : BasePlugin
         Preset3 = Config.Bind("Preset Name Options", "Preset3", "Preset_3");
         Preset4 = Config.Bind("Preset Name Options", "Preset4", "Preset_4");
         Preset5 = Config.Bind("Preset Name Options", "Preset5", "Preset_5");
+        Preset6 = Config.Bind("Preset Name Options", "Preset6", "Preset_6");
+        Preset7 = Config.Bind("Preset Name Options", "Preset7", "Preset_7");
+        Preset8 = Config.Bind("Preset Name Options", "Preset8", "Preset_8");
         WebhookURL = Config.Bind("Other", "WebhookURL", "none");
         BetaBuildURL = Config.Bind("Other", "BetaBuildURL", "");
         MessageWait = Config.Bind("Other", "MessageWait", 1);

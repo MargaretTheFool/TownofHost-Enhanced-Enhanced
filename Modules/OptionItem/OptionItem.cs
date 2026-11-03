@@ -330,6 +330,54 @@ public abstract class OptionItem
         if (targetPreset == activePreset) SyncAllOptions();
         return true;
     }
+    public static bool ResetPresets(int targetPreset = -1)
+    {
+        if (targetPreset < -1 || targetPreset >= NumPresets || IsRemotePreset ||
+            AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost || !GameStates.IsLobby) return false;
+
+        int activePreset = CurrentPreset;
+        int firstPreset = targetPreset == -1 ? 0 : targetPreset;
+        int presetEndExclusive = targetPreset == -1 ? NumPresets : targetPreset + 1;
+        var affectedOptions = AllOptions
+            .Where(option => option.Id != PresetId && !option.IsSingleValue)
+            .ToArray();
+        var previousValues = affectedOptions
+            .Select(option => (Option: option, Values: (int[])option.AllValues.Clone()))
+            .ToArray();
+
+        foreach (var option in affectedOptions)
+        {
+            for (int preset = firstPreset; preset < presetEndExclusive; preset++)
+            {
+                if (preset == activePreset)
+                    option.SetValue(option.DefaultValue, doSave: false, doSync: false);
+                else
+                    option.AllValues[preset] = option.DefaultValue;
+            }
+        }
+
+        if (!OptionSaver.TrySave())
+        {
+            foreach (var entry in previousValues)
+            {
+                for (int preset = firstPreset; preset < presetEndExclusive; preset++)
+                {
+                    if (preset == activePreset)
+                    {
+                        entry.Option.SetValue(entry.Values[preset], doSave: false, doSync: false);
+                        entry.Option.AllValues[preset] = entry.Values[preset];
+                        entry.Option.Refresh();
+                    }
+                    else
+                        entry.Option.AllValues[preset] = entry.Values[preset];
+                }
+            }
+            return false;
+        }
+
+        if (targetPreset == -1 || targetPreset == activePreset) SyncAllOptions();
+        return true;
+    }
     public static void SyncAllOptions(int targetId = -1)
     {
         if (
@@ -364,7 +412,7 @@ public abstract class OptionItem
         public int BeforeValue { get; set; } = beforeValue;
     }
 
-    public const int NumPresets = 5;
+    public const int NumPresets = 8;
     public const int RemotePreset = 8;
     public const int PresetId = 0;
 }

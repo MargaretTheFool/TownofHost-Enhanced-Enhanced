@@ -1,3 +1,4 @@
+using System;
 using TOHE.Modules;
 
 namespace TOHE;
@@ -19,15 +20,25 @@ public class PresetOptionItem(int defaultValue, TabGroup tab, bool vanilla) : Op
     {
         if (IsRemotePreset) return Translator.GetString("Preset") + " 9";
 
-        return CurrentValue switch
+        return GetPresetName(CurrentValue);
+    }
+
+    public static string GetPresetName(int preset)
+    {
+        var name = preset switch
         {
-            0 => Main.Preset1.Value == (string)Main.Preset1.DefaultValue ? Translator.GetString("Preset_1") : Main.Preset1.Value,
-            1 => Main.Preset2.Value == (string)Main.Preset2.DefaultValue ? Translator.GetString("Preset_2") : Main.Preset2.Value,
-            2 => Main.Preset3.Value == (string)Main.Preset3.DefaultValue ? Translator.GetString("Preset_3") : Main.Preset3.Value,
-            3 => Main.Preset4.Value == (string)Main.Preset4.DefaultValue ? Translator.GetString("Preset_4") : Main.Preset4.Value,
-            4 => Main.Preset5.Value == (string)Main.Preset5.DefaultValue ? Translator.GetString("Preset_5") : Main.Preset5.Value,
-            _ => null,
+            0 => Main.Preset1,
+            1 => Main.Preset2,
+            2 => Main.Preset3,
+            3 => Main.Preset4,
+            4 => Main.Preset5,
+            5 => Main.Preset6,
+            6 => Main.Preset7,
+            7 => Main.Preset8,
+            _ => throw new ArgumentOutOfRangeException(nameof(preset))
         };
+
+        return name.Value == (string)name.DefaultValue ? Translator.GetString($"Preset_{preset + 1}") : name.Value;
     }
     public override int GetValue()
         => IsRemotePreset ? RemotePreset : Rule.RepeatIndex(base.GetValue());
@@ -40,6 +51,8 @@ public class PresetOptionItem(int defaultValue, TabGroup tab, bool vanilla) : Op
     public override void SetValue(int afterValue, bool doSave, bool doSync = true)
     {
         var preset = Rule.RepeatIndex(afterValue);
+        if (doSave && preset != CurrentPreset && !OptionSaver.ReloadPreset(preset)) return;
+
         base.SetValue(preset, doSave: false, doSync: false);
         SwitchPreset(preset, doSync);
         if (doSave) OptionSaver.Save();

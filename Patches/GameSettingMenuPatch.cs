@@ -137,6 +137,9 @@ public class GameSettingMenuPatch
     private static PassiveButton RemotePresetCopyButton;
     private static TextMeshPro RemotePresetCopyLabel;
     private static GameObject RemotePresetCopyDialog;
+    private const string PresetDialogOverlayName = "TOHEPresetDialog";
+    private static readonly List<(PassiveUiElement Element, bool Enabled)> PresetDialogBackground = [];
+    private static bool PresetDialogControllerOpen;
     private static Sprite SolidSprite;
     public static FreeChatInputField InputField;
     public static List<OptionItem> HiddenBySearch = [];
@@ -462,15 +465,89 @@ public class GameSettingMenuPatch
 
         var root = CreatePresetCopyDialog(menu);
         CreatePresetCopyText(menu, root, "Title", GetString("PresetCopyChooseSource"),
-            new Vector3(0f, 1.15f, -1f), new Vector2(5.2f, 0.5f), 2.3f);
+            new Vector3(0f, 1.25f, -1f), new Vector2(5.2f, 0.4f), 2.3f);
         CreatePresetCopyButton(menu, root, "PreviousHost", GetString("PresetCopyPreviousHostChoice"),
-            new Vector3(0f, 0.46f, -2f), new Vector2(4.9f, 0.55f), OptionItem.HasRemotePreset,
+            new Vector3(0f, 0.69f, -2f), new Vector2(4.9f, 0.42f), OptionItem.HasRemotePreset,
             () => ShowPresetCopySelection(menu, OptionItem.RemotePreset, OptionItem.CurrentPreset));
         CreatePresetCopyButton(menu, root, "LocalPresets", GetString("PresetCopyLocalChoice"),
-            new Vector3(0f, -0.29f, -2f), new Vector2(4.9f, 0.55f), true,
+            new Vector3(0f, 0.11f, -2f), new Vector2(4.9f, 0.42f), true,
             () => ShowPresetCopySelection(menu, OptionItem.CurrentPreset, OptionItem.CurrentPreset));
+        CreatePresetCopyButton(menu, root, "ResetPresets", GetString("PresetResetChoice"),
+            new Vector3(0f, -0.47f, -2f), new Vector2(4.9f, 0.42f), true,
+            () => ShowPresetResetChoice(menu));
         CreatePresetCopyButton(menu, root, "Cancel", GetString("Cancel"),
-            new Vector3(0f, -1.2f, -2f), new Vector2(1.6f, 0.5f), true, CloseRemotePresetCopyConfirmation);
+            new Vector3(0f, -1.23f, -2f), new Vector2(1.6f, 0.45f), true, CloseRemotePresetCopyConfirmation);
+        OpenPresetDialogController(root);
+    }
+
+    private static void ShowPresetResetChoice(GameSettingMenu menu)
+    {
+        if (menu == null || !menu.isActiveAndEnabled || !CanCopyPreset()) return;
+
+        var root = CreatePresetCopyDialog(menu);
+        CreatePresetCopyText(menu, root, "Title", GetString("PresetResetChoice"),
+            new Vector3(0f, 1.15f, -1f), new Vector2(5.2f, 0.5f), 2.3f);
+        CreatePresetCopyButton(menu, root, "ResetOne", GetString("PresetResetOneChoice"),
+            new Vector3(0f, 0.46f, -2f), new Vector2(4.9f, 0.55f), true,
+            () => ShowPresetResetSelection(menu, OptionItem.CurrentPreset));
+        CreatePresetCopyButton(menu, root, "ResetAll", GetString("PresetResetAllChoice"),
+            new Vector3(0f, -0.29f, -2f), new Vector2(4.9f, 0.55f), true,
+            () => ShowPresetResetConfirmation(menu, -1));
+        CreatePresetCopyButton(menu, root, "Back", GetString("Back"),
+            new Vector3(-1f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true, () => ShowPresetCopySource(menu));
+        CreatePresetCopyButton(menu, root, "Cancel", GetString("Cancel"),
+            new Vector3(1f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true, CloseRemotePresetCopyConfirmation);
+        OpenPresetDialogController(root);
+    }
+
+    private static void ShowPresetResetSelection(GameSettingMenu menu, int targetPreset)
+    {
+        if (menu == null || !menu.isActiveAndEnabled || !CanCopyPreset()) return;
+
+        var root = CreatePresetCopyDialog(menu);
+        CreatePresetCopyText(menu, root, "Title", GetString("PresetResetSelect"),
+            new Vector3(0f, 1.15f, -1f), new Vector2(5.2f, 0.5f), 2.3f);
+        CreatePresetCopyText(menu, root, "TargetLabel", GetString("PresetCopyTarget"),
+            new Vector3(-1.65f, 0.15f, -1f), new Vector2(1.8f, 0.48f), 2.1f);
+        CreatePresetCopyText(menu, root, "TargetValue", GetPresetCopyName(targetPreset),
+            new Vector3(0.62f, 0.15f, -1f), new Vector2(1.7f, 0.48f), 2.1f);
+        CreatePresetCopyButton(menu, root, "TargetPrevious", "−",
+            new Vector3(-0.58f, 0.15f, -2f), new Vector2(0.48f, 0.48f), true,
+            () => ShowPresetResetSelection(menu, (targetPreset + OptionItem.NumPresets - 1) % OptionItem.NumPresets));
+        CreatePresetCopyButton(menu, root, "TargetNext", "+",
+            new Vector3(1.82f, 0.15f, -2f), new Vector2(0.48f, 0.48f), true,
+            () => ShowPresetResetSelection(menu, (targetPreset + 1) % OptionItem.NumPresets));
+        CreatePresetCopyButton(menu, root, "Back", GetString("Back"),
+            new Vector3(-1.85f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true, () => ShowPresetResetChoice(menu));
+        CreatePresetCopyButton(menu, root, "Next", GetString("PresetCopyNext"),
+            new Vector3(0f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true,
+            () => ShowPresetResetConfirmation(menu, targetPreset));
+        CreatePresetCopyButton(menu, root, "Cancel", GetString("Cancel"),
+            new Vector3(1.85f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true, CloseRemotePresetCopyConfirmation);
+        OpenPresetDialogController(root);
+    }
+
+    private static void ShowPresetResetConfirmation(GameSettingMenu menu, int targetPreset)
+    {
+        if (menu == null || !menu.isActiveAndEnabled || !CanCopyPreset()) return;
+
+        bool all = targetPreset == -1;
+        string prompt = all
+            ? string.Format(GetString("PresetResetAllConfirm"), OptionItem.NumPresets)
+            : string.Format(GetString("PresetResetOneConfirm"), GetPresetCopyName(targetPreset)) + "\n" +
+                GetString(targetPreset == OptionItem.CurrentPreset ? "PresetResetAffectsCurrent" : "PresetCopyKeepsCurrent");
+        var root = CreatePresetCopyDialog(menu);
+        CreatePresetCopyText(menu, root, "Message", prompt,
+            new Vector3(0f, 0.3f, -1f), new Vector2(5.3f, 1.65f), 2.15f);
+        CreatePresetCopyButton(menu, root, "Back", GetString("Back"),
+            new Vector3(-1.85f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true,
+            () => { if (all) ShowPresetResetChoice(menu); else ShowPresetResetSelection(menu, targetPreset); });
+        CreatePresetCopyButton(menu, root, "Confirm", GetString("PresetResetConfirmButton"),
+            new Vector3(0f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true,
+            () => ConfirmPresetReset(menu, targetPreset));
+        CreatePresetCopyButton(menu, root, "Cancel", GetString("Cancel"),
+            new Vector3(1.85f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true, CloseRemotePresetCopyConfirmation);
+        OpenPresetDialogController(root);
     }
 
     private static void ShowPresetCopySelection(GameSettingMenu menu, int sourcePreset, int targetPreset)
@@ -520,6 +597,7 @@ public class GameSettingMenuPatch
             () => ShowPresetCopyConfirmation(menu, sourcePreset, targetPreset));
         CreatePresetCopyButton(menu, root, "Cancel", GetString("Cancel"),
             new Vector3(1.85f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true, CloseRemotePresetCopyConfirmation);
+        OpenPresetDialogController(root);
     }
 
     private static void ShowPresetCopyConfirmation(GameSettingMenu menu, int sourcePreset, int targetPreset)
@@ -545,29 +623,43 @@ public class GameSettingMenuPatch
             () => ConfirmPresetCopy(menu, sourcePreset, targetPreset));
         CreatePresetCopyButton(menu, root, "Cancel", GetString("Cancel"),
             new Vector3(1.85f, -1.27f, -2f), new Vector2(1.5f, 0.5f), true, CloseRemotePresetCopyConfirmation);
+        OpenPresetDialogController(root);
     }
 
     private static string GetPresetCopyName(int preset)
     {
-        var name = preset switch
-        {
-            0 => Main.Preset1,
-            1 => Main.Preset2,
-            2 => Main.Preset3,
-            3 => Main.Preset4,
-            _ => Main.Preset5,
-        };
-        return name.Value == (string)name.DefaultValue ? GetString($"Preset_{preset + 1}") : name.Value;
+        return PresetOptionItem.GetPresetName(preset);
     }
 
     private static GameObject CreatePresetCopyDialog(GameSettingMenu menu)
     {
         CloseRemotePresetCopyConfirmation();
+
+        // Native UI input is ordered by element Z; suspend only this menu while
+        // leaving the HUD's chat, settings and friends controls interactive.
+        float frontZ = menu.transform.position.z;
+        foreach (var element in menu.GetComponentsInChildren<PassiveUiElement>(true))
+        {
+            if (element == null || !element.gameObject.activeInHierarchy) continue;
+            frontZ = Math.Min(frontZ, element.transform.position.z);
+            PresetDialogBackground.Add((element, element.enabled));
+            element.enabled = false;
+        }
+        foreach (var renderer in menu.GetComponentsInChildren<Renderer>(true))
+        {
+            if (renderer != null && renderer.enabled && renderer.gameObject.activeInHierarchy)
+                frontZ = Math.Min(frontZ, renderer.transform.position.z);
+        }
+        DestroyableSingleton<PassiveButtonManager>.Instance.LoseFocusForAll();
+
         var root = new GameObject("PresetCopyDialog");
         RemotePresetCopyDialog = root;
         root.layer = menu.gameObject.layer;
         root.transform.SetParent(menu.transform, false);
-        root.transform.localPosition = new Vector3(0f, 0f, -15f);
+        root.transform.localPosition = Vector3.zero;
+        var position = root.transform.position;
+        position.z = frontZ - 1f;
+        root.transform.position = position;
 
         if (!SolidSprite)
         {
@@ -597,6 +689,7 @@ public class GameSettingMenuPatch
         var blockerCollider = blocker.GetComponent<BoxCollider2D>();
         blockerCollider.offset = Vector2.zero;
         blockerCollider.size = new Vector2(30f, 20f);
+        blockerCollider.enabled = true;
         blocker.OnClick = new();
         blocker.OnClick.AddListener((UnityEngine.Events.UnityAction)(() => { }));
         blocker.SetButtonEnableState(true);
@@ -658,6 +751,8 @@ public class GameSettingMenuPatch
         var collider = button.GetComponent<BoxCollider2D>();
         collider.offset = Vector2.zero;
         collider.size = size;
+        collider.enabled = enabled;
+        button.ControllerNav = new ControllerNavigation { mode = ControllerNavigation.Mode.Automatic };
         CenterClonedButtonContents(button);
         foreach (var state in new[] { button.inactiveSprites, button.activeSprites,
             button.selectedSprites, button.selectedInactiveSprites, button.disabledSprites,
@@ -684,11 +779,29 @@ public class GameSettingMenuPatch
         button.SetButtonEnableState(true);
         if (!enabled)
         {
-            collider.enabled = false;
             foreach (var sprite in button.GetComponentsInChildren<SpriteRenderer>(true))
                 sprite.color = new Color32(80, 84, 85, 255);
             label.color = new Color32(157, 161, 161, 255);
         }
+    }
+
+    private static void OpenPresetDialogController(GameObject root)
+    {
+        var selectable = new Il2CppSystem.Collections.Generic.List<UiElement>();
+        PassiveButton first = null;
+        PassiveButton back = null;
+        foreach (var button in root.GetComponentsInChildren<PassiveButton>(true))
+        {
+            if (button == null || !button.isActiveAndEnabled || button.name == "Blocker") continue;
+            var collider = button.GetComponent<Collider2D>();
+            if (collider == null || !collider.enabled) continue;
+            selectable.Add(button);
+            first ??= button;
+            if (button.name == "Back" || (button.name == "Cancel" && back == null)) back = button;
+        }
+        if (ControllerManager.Instance == null || first == null) return;
+        ControllerManager.Instance.OpenOverlayMenu(PresetDialogOverlayName, back ?? first, first, selectable);
+        PresetDialogControllerOpen = true;
     }
 
     private static void ConfirmPresetCopy(GameSettingMenu menu, int sourcePreset, int targetPreset)
@@ -703,7 +816,26 @@ public class GameSettingMenuPatch
             HudManager.Instance?.ShowPopUp(GetString("RemotePresetCopyFailed"));
             return;
         }
+        RefreshPresetMenus(previousMode);
+    }
 
+    private static void ConfirmPresetReset(GameSettingMenu menu, int targetPreset)
+    {
+        CloseRemotePresetCopyConfirmation();
+        RefreshRemotePresetCopyButton();
+        if (menu == null || !menu.isActiveAndEnabled || !CanCopyPreset()) return;
+
+        var previousMode = Options.CurrentGameMode;
+        if (!OptionItem.ResetPresets(targetPreset))
+        {
+            HudManager.Instance?.ShowPopUp(GetString("PresetResetFailed"));
+            return;
+        }
+        RefreshPresetMenus(previousMode);
+    }
+
+    private static void RefreshPresetMenus(CustomGameMode previousMode)
+    {
         if (previousMode != Options.CurrentGameMode)
         {
             GameOptionsMenuPatch.ReOpenSettings(1);
@@ -726,10 +858,20 @@ public class GameSettingMenuPatch
     }
     private static void CloseRemotePresetCopyConfirmation()
     {
-        if (RemotePresetCopyDialog == null) return;
-        RemotePresetCopyDialog.SetActive(false);
-        Object.Destroy(RemotePresetCopyDialog);
+        if (RemotePresetCopyDialog != null)
+        {
+            RemotePresetCopyDialog.SetActive(false);
+            Object.Destroy(RemotePresetCopyDialog);
+        }
         RemotePresetCopyDialog = null;
+        foreach (var (element, enabled) in PresetDialogBackground)
+            if (element != null) element.enabled = enabled;
+        PresetDialogBackground.Clear();
+        if (PresetDialogControllerOpen && ControllerManager.Instance != null &&
+            ControllerManager.Instance.CurrentUiState != null &&
+            ControllerManager.Instance.IsMenuActiveAtAll(PresetDialogOverlayName))
+            ControllerManager.Instance.CloseOverlayMenu(PresetDialogOverlayName);
+        PresetDialogControllerOpen = false;
     }
 
     [HarmonyPatch(nameof(GameSettingMenu.ChangeTab)), HarmonyPrefix]

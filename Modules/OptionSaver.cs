@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text.Json;
 
@@ -8,7 +8,22 @@ namespace TOHE.Modules;
 public static class OptionSaver
 {
     private static readonly DirectoryInfo SaveDataDirectoryInfo = new("./TOHE-DATA/SaveData/");
-    private static readonly FileInfo OptionSaverFileInfo = new($"{SaveDataDirectoryInfo.FullName}/Options.json");
+    private static readonly string LegacyPath = Path.Combine(SaveDataDirectoryInfo.FullName, "Options.json");
+    private static readonly string GlobalPath = Path.Combine(SaveDataDirectoryInfo.FullName, "GlobalOptions.jsonc");
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true,
+        WriteIndented = true,
+    };
+
+    private static Dictionary<int, int> savedGlobal;
+    private static readonly Dictionary<int, int>[] savedPresets = new Dictionary<int, int>[OptionItem.NumPresets];
+    private static readonly bool[] blockedPresets = new bool[OptionItem.NumPresets];
+    private static bool loading;
+    private static bool loadFailed = true;
+
+    private static string PresetPath(int preset) => Path.Combine(SaveDataDirectoryInfo.FullName, $"Preset{preset + 1}.jsonc");
 
     public static void Initialize()
     {
@@ -17,99 +32,65 @@ public static class OptionSaver
             SaveDataDirectoryInfo.Create();
             SaveDataDirectoryInfo.Attributes |= FileAttributes.Hidden;
         }
-        if (!OptionSaverFileInfo.Exists)
-        {
-            OptionSaverFileInfo.Create().Dispose();
-        }
     }
-    /// <summary>Generate object for json serialization from current options</summary>
-    private static SerializableOptionsData GenerateOptionsData()
+
+    /// <summary>Save current options to the files whose values have changed.</summary>
+    public static void Save() => TrySave();
+
+    /// <summary>Atomically persist changed files and report whether all required writes succeeded.</summary>
+    public static bool TrySave()
     {
-        Dictionary<int, int> singleOptions = [];
-        Dictionary<int, int[]> presetOptions = [];
+        if (loading || loadFailed || blockedPresets.Any(blocked => blocked) ||
+            (AmongUsClient.Instance != null && AmongUsClient.Instance.AmConnected && !AmongUsClient.Instance.AmHost)) return false;
+
+        Dictionary<int, int> global = [];
+        var presets = Enumerable.Range(0, OptionItem.NumPresets)
+            .Select(_ => new Dictionary<int, int>()).ToArray();
         foreach (var option in OptionItem.AllOptions)
         {
             if (option.IsSingleValue)
-            {
-                if (!singleOptions.TryAdd(option.Id, option.SingleValue))
-                {
-                    Logger.Warn($"Duplicate SingleOption ID: {option.Id}", "Option Saver");
-                }
-            }
-            else if (!presetOptions.TryAdd(option.Id, (int[])option.AllValues.Clone()))
-            {
-                Logger.Warn($"Duplicate preset option ID: {option.Id}", "Option Saver");
-            }
+                global[option.Id] = option.SingleValue;
+            else
+                for (int i = 0; i < OptionItem.NumPresets; i++)
+                    presets[i][option.Id] = option.AllValues[i];
         }
-        return new SerializableOptionsData
-        {
-            Version = Version,
-            SingleOptions = singleOptions,
-            PresetOptions = presetOptions,
-        };
-    }
-    /// <summary>Read deserialized object and set option values</summary>
-    private static void LoadOptionsData(SerializableOptionsData serializableOptionsData)
-    {
-        if (serializableOptionsData.Version != Version)
-        {
-            // If you want to provide a method for migrating between versions in the future, you can distribute the conversion method for each version here
-            Logger.Warn($"Loaded option version {serializableOptionsData.Version} does not match current version {Version}; keeping defaults and preserving the saved file", "Option Saver");
-            return;
-        }
-        if (serializableOptionsData.SingleOptions == null || serializableOptionsData.PresetOptions == null)
-            throw new JsonException("Option data is missing its option dictionaries");
-        Dictionary<int, int> singleOptions = serializableOptionsData.SingleOptions;
-        Dictionary<int, int[]> presetOptions = serializableOptionsData.PresetOptions;
-        foreach (var singleOption in singleOptions)
-        {
-            var id = singleOption.Key;
-            var value = singleOption.Value;
-            if (OptionItem.FastOptions.TryGetValue(id, out var optionItem))
-            {
-                if (optionItem.IsSingleValue)
-                {
-                    optionItem.SetValue(value, doSave: false, doSync: false);
-                }
-                else if (!presetOptions.ContainsKey(id))
-                {
-                    optionItem.SetAllValues(Enumerable.Repeat(value, OptionItem.NumPresets).ToArray());
-                }
-            }
-        }
-        foreach (var presetOption in presetOptions)
-        {
-            var id = presetOption.Key;
-            var values = presetOption.Value;
-            if (OptionItem.FastOptions.TryGetValue(id, out var optionItem) && !optionItem.IsSingleValue)
-            {
-                optionItem.SetAllValues(values);
-            }
-        }
-        foreach (var option in OptionItem.AllOptions)
-            option.Refresh();
-    }
-    /// <summary>Save current options to json file</summary>
-    public static void Save()
-        => TrySave();
 
-    /// <summary>Atomically persist all presets and report whether the file was committed.</summary>
-    public static bool TrySave()
-    {
-        if (AmongUsClient.Instance != null && !AmongUsClient.Instance.AmHost) return false;
+        if (!SameValues(global, savedGlobal) || !File.Exists(GlobalPath))
+        {
+            if (!WriteOptionsFile(GlobalPath, global, isPreset: false)) return false;
+            savedGlobal = global;
+        }
+        for (int i = 0; i < OptionItem.NumPresets; i++)
+        {
+            string path = PresetPath(i);
+            if (SameValues(presets[i], savedPresets[i]) && File.Exists(path)) continue;
+            if (!WriteOptionsFile(path, presets[i], isPreset: true)) return false;
+            savedPresets[i] = presets[i];
+        }
+        return true;
+    }
 
-        var temporaryPath = OptionSaverFileInfo.FullName + "." + Guid.NewGuid().ToString("N") + ".tmp";
+    private static bool SameValues(Dictionary<int, int> current, Dictionary<int, int> saved) =>
+        saved != null && current.Count == saved.Count &&
+        current.All(entry => saved.TryGetValue(entry.Key, out var value) && value == entry.Value);
+
+    private static bool WriteOptionsFile(string path, Dictionary<int, int> options, bool isPreset)
+    {
+        string temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            var jsonString = JsonSerializer.Serialize(GenerateOptionsData(), new JsonSerializerOptions { WriteIndented = true, });
+            var data = new SerializableOptionFileData { Version = Version, Options = options };
+            string header = isPreset
+                ? "// Option IDs map to stored indexes, not displayed values.\n// Copy over any preset file and select that preset to load it.\n"
+                : "// Global option IDs map to stored indexes, including the local preset selector.\n";
             Directory.CreateDirectory(SaveDataDirectoryInfo.FullName);
-            File.WriteAllText(temporaryPath, jsonString);
-            File.Move(temporaryPath, OptionSaverFileInfo.FullName, overwrite: true);
+            File.WriteAllText(temporaryPath, header + JsonSerializer.Serialize(data, JsonOptions));
+            File.Move(temporaryPath, path, overwrite: true);
             return true;
         }
-        catch (System.Exception error)
+        catch (Exception error)
         {
-            Logger.Error($"Error: {error}", "OptionSaver.Save");
+            Logger.Error($"Unable to save option file {path}: {error}", "OptionSaver.Save");
             return false;
         }
         finally
@@ -118,39 +99,158 @@ public static class OptionSaver
             catch (Exception error) { Logger.Error($"Temporary option file cleanup failed: {error}", "OptionSaver.Save"); }
         }
     }
-    /// <summary>Read options from json file</summary>
+
+    private static SerializableOptionFileData ReadOptionsFile(string path)
+    {
+        var data = JsonSerializer.Deserialize<SerializableOptionFileData>(File.ReadAllText(path), JsonOptions)
+            ?? throw new JsonException($"Option file is null: {path}");
+        if (data.Version != Version || data.Options == null)
+            throw new JsonException($"Option file has an unsupported version or is missing its options: {path}");
+        return data;
+    }
+
+    /// <summary>Load every file before applying any values, falling back to legacy data for missing files.</summary>
     public static void Load()
     {
+        if (loading) return;
+        loading = true;
+        loadFailed = true;
         try
         {
-            var jsonString = File.ReadAllText(OptionSaverFileInfo.FullName);
-            // if empty, do not read, save default value
-            if (string.IsNullOrWhiteSpace(jsonString))
+            var global = File.Exists(GlobalPath) ? ReadOptionsFile(GlobalPath) : null;
+            var presets = new SerializableOptionFileData[OptionItem.NumPresets];
+            for (int i = 0; i < presets.Length; i++)
             {
-                Logger.Info("Save default value as option data is empty", "Option Saver");
-                Save();
-                return;
+                string path = PresetPath(i);
+                if (File.Exists(path)) presets[i] = ReadOptionsFile(path);
             }
-            var data = JsonSerializer.Deserialize<SerializableOptionsData>(jsonString)
-                ?? throw new JsonException("Option data is null");
-            LoadOptionsData(data);
+
+            SerializableOptionsData legacy = null;
+            if ((global == null || presets.Any(preset => preset == null)) && File.Exists(LegacyPath))
+            {
+                string json = File.ReadAllText(LegacyPath);
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    legacy = JsonSerializer.Deserialize<SerializableOptionsData>(json, JsonOptions)
+                        ?? throw new JsonException("Legacy option data is null");
+                    if (legacy.Version != Version || legacy.SingleOptions == null || legacy.PresetOptions == null)
+                        throw new JsonException("Legacy option data has an unsupported version or is missing its option dictionaries");
+                }
+            }
+
+            Dictionary<OptionItem, int> singleValues = [];
+            Dictionary<OptionItem, int[]> presetValues = [];
+            foreach (var option in OptionItem.AllOptions)
+            {
+                if (option.IsSingleValue)
+                {
+                    var values = global?.Options ?? legacy?.SingleOptions;
+                    singleValues[option] = values != null && values.TryGetValue(option.Id, out int value)
+                        ? value : option.DefaultValue;
+                    continue;
+                }
+
+                var restored = new int[OptionItem.NumPresets];
+                for (int i = 0; i < restored.Length; i++)
+                {
+                    restored[i] = option.DefaultValue;
+                    if (presets[i] != null)
+                    {
+                        if (presets[i].Options.TryGetValue(option.Id, out int value)) restored[i] = value;
+                    }
+                    else if (legacy != null)
+                    {
+                        if (legacy.PresetOptions.TryGetValue(option.Id, out int[] values))
+                        {
+                            if (values != null && i < values.Length) restored[i] = values[i];
+                        }
+                        else if (legacy.SingleOptions.TryGetValue(option.Id, out int value))
+                            restored[i] = value;
+                    }
+                }
+                presetValues[option] = restored;
+            }
+
+            // The preset selector is a single option; its SetValue calls SwitchPreset.
+            // Apply the arrays first and keep loading true so its reload is a no-op.
+            foreach (var entry in presetValues) entry.Key.SetAllValues(entry.Value);
+            foreach (var entry in singleValues) entry.Key.SetValue(entry.Value, doSave: false, doSync: false);
+            foreach (var option in OptionItem.AllOptions) option.Refresh();
+
+            savedGlobal = global == null ? null : OptionItem.AllOptions
+                .Where(option => option.IsSingleValue).ToDictionary(option => option.Id, option => option.SingleValue);
+            for (int i = 0; i < presets.Length; i++)
+            {
+                int preset = i;
+                savedPresets[i] = presets[i] == null ? null :
+                    OptionItem.AllOptions.Where(option => !option.IsSingleValue)
+                        .ToDictionary(option => option.Id, option => option.AllValues[preset]);
+            }
+            Array.Fill(blockedPresets, false);
+            loadFailed = false;
         }
         catch (Exception error)
         {
-            Logger.Error($"Unable to load options; keeping defaults and preserving the saved file: {error}", "OptionSaver.Load");
+            Logger.Error($"Unable to load options; keeping existing values and preserving saved files: {error}", "OptionSaver.Load");
+        }
+        finally
+        {
+            loading = false;
+        }
+
+        // Create only missing files after all input has been validated and applied.
+        if (!loadFailed) TrySave();
+    }
+
+    /// <summary>Re-read a zero-based preset before selecting it, without touching any other file.</summary>
+    public static bool ReloadPreset(int preset)
+    {
+        if (loading) return true;
+        if (loadFailed || preset < 0 || preset >= OptionItem.NumPresets) return false;
+        try
+        {
+            string path = PresetPath(preset);
+            var data = File.Exists(path) ? ReadOptionsFile(path) : null;
+            Dictionary<int, int> values = [];
+            foreach (var option in OptionItem.AllOptions)
+            {
+                if (option.IsSingleValue) continue;
+                values[option.Id] = data != null && data.Options.TryGetValue(option.Id, out int value)
+                    ? value : option.DefaultValue;
+            }
+
+            foreach (var option in OptionItem.AllOptions)
+            {
+                if (option.IsSingleValue) continue;
+                option.AllValues[preset] = values[option.Id];
+                if (OptionItem.CurrentPreset == preset) option.Refresh();
+            }
+            savedPresets[preset] = data == null ? null : values;
+            blockedPresets[preset] = false;
+            return true;
+        }
+        catch (Exception error)
+        {
+            blockedPresets[preset] = true;
+            Logger.Error($"Unable to reload preset {preset + 1}; keeping existing values and preserving the saved file: {error}", "OptionSaver.Load");
+            return false;
         }
     }
 
-    /// <summary>Optional data suitable for json storage</summary>
+    public class SerializableOptionFileData
+    {
+        public int Version { get; init; }
+        public Dictionary<int, int> Options { get; init; }
+    }
+
+    /// <summary>Legacy Options.json data, retained for migration.</summary>
     public class SerializableOptionsData
     {
         public int Version { get; init; }
-        /// <summary>Non-preset options</summary>
         public Dictionary<int, int> SingleOptions { get; init; }
-        /// <summary>Options in the preset</summary>
         public Dictionary<int, int[]> PresetOptions { get; init; }
     }
 
-    /// <summary>Raise the number here when making incompatible changes to the format of an option (e.g., changing the number of presets)</summary>
+    /// <summary>Raise when making incompatible changes to the format of an option.</summary>
     public static readonly int Version = 1;
 }

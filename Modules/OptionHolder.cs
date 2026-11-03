@@ -39,7 +39,8 @@ public static class Options
     private static readonly string[] presets =
     [
         Main.Preset1.Value, Main.Preset2.Value, Main.Preset3.Value,
-        Main.Preset4.Value, Main.Preset5.Value
+        Main.Preset4.Value, Main.Preset5.Value, Main.Preset6.Value,
+        Main.Preset7.Value, Main.Preset8.Value
     ];
 
     // Custom Game Mode
