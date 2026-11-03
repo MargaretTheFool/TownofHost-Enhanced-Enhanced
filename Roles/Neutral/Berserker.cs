@@ -130,7 +130,7 @@ internal class Berserker : RoleBase
 
         if (BerserkerKillMax[killer.PlayerId] >= BerserkerKillCooldownLevel.GetInt() && BerserkerOneCanKillCooldown.GetBool())
         {
-            Main.AllPlayerKillCooldown[killer.PlayerId] = BerserkerOneKillCooldown.GetFloat();
+            Main.AllPlayerKillCooldown[killer.PlayerId] = killer.Is(CustomRoles.War) ? WarKillCooldown.GetFloat() : BerserkerOneKillCooldown.GetFloat();
             killer.SetKillCooldown();
         }
 
@@ -172,7 +172,9 @@ internal class Berserker : RoleBase
         if (BerserkerKillMax[killer.PlayerId] >= BerserkerImmortalLevel.GetInt() && BerserkerFourCanNotKill.GetBool() && !killer.Is(CustomRoles.War))
         {
             killer.RpcSetCustomRole(CustomRoles.War);
-            killer.GetRoleClass()?.OnAdd(killer.PlayerId);
+            Berserker war = (Berserker)killer.GetRoleClass();
+            war.OnAdd(killer.PlayerId);
+            war.BerserkerKillMax[killer.PlayerId] = BerserkerKillMax[killer.PlayerId];
 
             killer.Notify(GetString("BerserkerToWar"));
             Main.AllPlayerKillCooldown[killer.PlayerId] = WarKillCooldown.GetFloat();
@@ -182,15 +184,23 @@ internal class Berserker : RoleBase
         return noScav;
     }
 }
-internal class War : RoleBase
+internal class War : Berserker
 {
     //===========================SETUP================================\\
-    public static bool HasEnabled => CustomRoleManager.HasEnabled(CustomRoles.Berserker);
+    public new static bool HasEnabled => CustomRoleManager.HasEnabled(CustomRoles.Berserker);
     public override bool IsDesyncRole => true;
     public override CustomRoles ThisRoleBase => CustomRoles.Impostor;
     public override Custom_RoleType ThisRoleType => Custom_RoleType.NeutralApocalypse;
     //==================================================================\\
 
+    public override void SetupCustomOption() { }
+    public override void Init() { }
+    public override void Add(byte playerId)
+    {
+        base.Add(playerId);
+        Main.AllPlayerKillCooldown[playerId] = WarKillCooldown.GetFloat();
+    }
+    public override string GetProgressText(byte playerId, bool cvooms) => string.Empty;
     public override bool OthersKnowTargetRoleColor(PlayerControl seer, PlayerControl target)
         => KnowRoleTarget(seer, target);
     public override bool KnowRoleTarget(PlayerControl seer, PlayerControl target)
@@ -200,8 +210,4 @@ internal class War : RoleBase
     public override bool CanUseKillButton(PlayerControl pc) => true;
     public override bool CanUseImpostorVentButton(PlayerControl pc) => Berserker.WarCanVent.GetBool();
     public override bool OnCheckMurderAsTarget(PlayerControl killer, PlayerControl target) => false;
-    public override bool OnCheckMurderAsKiller(PlayerControl killer, PlayerControl target)
-    {
-        return CustomRoles.Berserker.GetStaticRoleClass().OnCheckMurderAsKiller(killer, target);
-    }
 }
