@@ -3,6 +3,7 @@ using AmongUs.GameOptions;
 using InnerNet;
 using System;
 using TMPro;
+using TOHE.Modules;
 using TOHE.Patches;
 using UnityEngine;
 using static TOHE.Translator;
@@ -15,7 +16,7 @@ public static class GameStartManagerMinPlayersPatch
 {
     public static void Prefix(GameStartManager __instance)
     {
-        __instance.MinPlayers = 1;
+        __instance.MinPlayers = ServerLimits.IsOfficial ? 4 : 1;
     }
 }
 public class GameStartManagerPatch
@@ -428,9 +429,10 @@ class ResetStartStatePatch
 [HarmonyPatch(typeof(IGameOptionsExtensions), nameof(IGameOptionsExtensions.GetAdjustedNumImpostors))]
 class UnrestrictedNumImpostorsPatch
 {
-    public static bool Prefix(ref int __result)
+    public static bool Prefix([HarmonyArgument(0)] IGameOptions options, ref int __result)
     {
-        __result = GameOptionsManager.Instance.CurrentGameOptions.NumImpostors;
+        if (ServerLimits.IsOfficial) return true;
+        __result = options.NumImpostors;
         return false;
     }
 }

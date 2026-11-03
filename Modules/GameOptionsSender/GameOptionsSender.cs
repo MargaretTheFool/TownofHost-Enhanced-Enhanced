@@ -31,6 +31,7 @@ public abstract class GameOptionsSender
     public virtual void SendGameOptions(OfficialPacketBuilder.Batch batch = null)
     {
         var opt = BuildGameOptions();
+        ServerLimits.Normalize(opt);
         // Keep version framing identical to LogicOptions.Serialize in the game.
         var factory = new GameOptionsFactory(new UnityLogger().Cast<ILogger>());
         SendOptionsArray(factory.ToBytes(opt, AprilFoolsMode.IsAprilFoolsModeToggledOn), batch);

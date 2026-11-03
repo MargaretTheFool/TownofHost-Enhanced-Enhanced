@@ -1,6 +1,7 @@
 using BepInEx.Unity.IL2CPP.Utils.Collections;
 using System;
 using TMPro;
+using TOHE.Modules;
 using TOHE.Patches;
 using UnityEngine;
 using static TOHE.Translator;
@@ -621,6 +622,13 @@ public static class NumberOptionPatch
             return 1;
         }
     }
+    [HarmonyPatch(nameof(NumberOption.SetUpFromData)), HarmonyPrefix]
+    private static void SetUpFromDataPrefix(BaseGameSetting data)
+    {
+        if (data != null && data.Type == OptionTypes.Int &&
+            data.Cast<IntGameSetting>().OptionName is AmongUs.GameOptions.Int32OptionNames.MaxPlayers or AmongUs.GameOptions.Int32OptionNames.NumImpostors)
+            ServerLimits.Refresh();
+    }
     [HarmonyPatch(nameof(NumberOption.Initialize)), HarmonyPrefix]
     private static bool InitializePrefix(NumberOption __instance)
     {
@@ -647,10 +655,13 @@ public static class NumberOptionPatch
                 __instance.Increment = 0.05f;
                 __instance.Value = (float)Math.Round(__instance.Value, 2);
                 break;
-            case StringNames.GameNumImpostors when DebugModeManager.IsDebugMode:
-                __instance.ValidRange.min = 0;
+            case StringNames.GameNumImpostors:
+                __instance.ValidRange = new(ServerLimits.MinImpostors, ServerLimits.MaxImpostors);
                 break;
         }
+
+        if (__instance.intOptionName == AmongUs.GameOptions.Int32OptionNames.MaxPlayers)
+            __instance.ValidRange = new(ServerLimits.MinPlayers, ServerLimits.MaxPlayers);
 
         if (ModGameOptionsMenu.OptionList.TryGetValue(__instance, out var index))
         {

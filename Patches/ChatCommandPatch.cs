@@ -406,14 +406,16 @@ internal class ChatCommands
                 case "/玩家数量":
                 case "/玩家":
                     canceled = true;
-                    subArgs = args.Length < 2 ? "" : args[1];
-                    Utils.SendMessage(GetString("Message.MaxPlayers") + subArgs);
-                    var numbereer = Convert.ToByte(subArgs);
-                    if (GameStates.IsNormalGame)
-                        GameOptionsManager.Instance.currentNormalGameOptions.MaxPlayers = numbereer;
-
-                    else if (GameStates.IsHideNSeek)
-                        GameOptionsManager.Instance.currentHideNSeekGameOptions.MaxPlayers = numbereer;
+                    if (args.Length < 2 || !int.TryParse(args[1], out var playerLimit) ||
+                        playerLimit < ServerLimits.MinPlayers || playerLimit > ServerLimits.MaxPlayers)
+                    {
+                        Utils.SendMessage($"/setplayers {ServerLimits.MinPlayers}–{ServerLimits.MaxPlayers}");
+                        break;
+                    }
+                    GameOptionsManager.Instance.CurrentGameOptions.SetInt(AmongUs.GameOptions.Int32OptionNames.MaxPlayers, playerLimit);
+                    GameOptionsManager.Instance.GameHostOptions = GameOptionsManager.Instance.CurrentGameOptions;
+                    GameManager.Instance?.LogicOptions?.SetDirty();
+                    Utils.SendMessage(GetString("Message.MaxPlayers") + playerLimit);
                     break;
 
                 case "/h":

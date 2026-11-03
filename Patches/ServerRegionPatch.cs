@@ -7,6 +7,7 @@ namespace TOHE.Patches;
 [HarmonyPatch(typeof(HttpMatchmakerManager), nameof(HttpMatchmakerManager.CoFindGameInfo))]
 internal static class FindGameRegionPatch
 {
+    internal static bool IsLookingUp { get; private set; }
     public static void Prefix(HttpMatchmakerManager __instance,
         ref Il2CppSystem.Action<HttpMatchmakerManager.FindGameByCodeResponse, string> onGameInfo)
     {
@@ -27,7 +28,26 @@ internal static class FindGameRegionPatch
     public static void Postfix(ref Il2CppSystem.Collections.IEnumerator __result)
     {
         if (__result == null) return;
-        __result = ServerRegionCoroutine.BeforeStart(__result, ServerRegion.ClearLookup).WrapToIl2Cpp();
+        __result = TrackLookup(__result).WrapToIl2Cpp();
+    }
+
+    private static System.Collections.IEnumerator TrackLookup(Il2CppSystem.Collections.IEnumerator original)
+    {
+        IsLookingUp = true;
+        ServerRegion.ClearLookup();
+        try
+        {
+            while (original.MoveNext()) yield return original.Current;
+        }
+        finally
+        {
+            try { original.TryCast<Il2CppSystem.IDisposable>()?.Dispose(); }
+            finally
+            {
+                IsLookingUp = false;
+                ServerLimits.Refresh();
+            }
+        }
     }
 }
 
@@ -48,6 +68,7 @@ internal static class ConnectGameRegionPatch
             // Resolve before the original's first MoveNext calls SetEndpoint/
             // CoConnect, rather than when its iterator is merely constructed.
             ServerRegion.BeginConnection(__instance.GameId, ipAddress, port);
+            ServerLimits.Refresh();
         }).WrapToIl2Cpp();
     }
 }
@@ -73,6 +94,51 @@ internal static class DisconnectGameRegionPatch
         // CoConnect disconnects the old socket after a UDP redirect. The new
         // endpoint still belongs to the same region and needs its auth decision.
         if (reason != DisconnectReasons.NewConnection)
+        {
             ServerRegion.ClearConnection();
+            ServerLimits.Refresh();
+        }
+    }
+}
+
+[HarmonyPatch(typeof(ServerManager), nameof(ServerManager.SetRegion))]
+internal static class SelectedRegionLimitsPatch
+{
+    private static void Postfix()
+    {
+        // Code lookup temporarily switches the selected region. Connection
+        // setup applies the policy to the endpoint that is actually joined.
+        if (FindGameRegionPatch.IsLookingUp) return;
+
+        ServerLimits.Refresh();
+        foreach (var option in UnityEngine.Object.FindObjectsOfType<NumberOption>())
+        {
+            if (option.intOptionName is not (AmongUs.GameOptions.Int32OptionNames.MaxPlayers or
+                                            AmongUs.GameOptions.Int32OptionNames.NumImpostors)) continue;
+            option.Initialize();
+            option.oldValue = float.MaxValue;
+        }
+    }
+}
+
+[HarmonyPatch(typeof(CreateGameOptions), nameof(CreateGameOptions.Show))]
+internal static class CreateGameLimitsPatch
+{
+    private static void Prefix() => ServerLimits.Refresh();
+}
+
+[HarmonyPatch(typeof(CreateGameOptions), nameof(CreateGameOptions.Confirm))]
+internal static class CreateGameConfirmLimitsPatch
+{
+    private static bool Prefix(CreateGameOptions __instance)
+    {
+        ServerLimits.Refresh();
+        if (ServerLimits.IsOfficial) return true;
+
+        // The native confirmation indexes a 16-player table and replaces zero
+        // impostors with one. Keep its connection gate and permission flow.
+        if (DestroyableSingleton<MatchMaker>.Instance.Connecting(__instance))
+            __instance.CoStartGame();
+        return false;
     }
 }
