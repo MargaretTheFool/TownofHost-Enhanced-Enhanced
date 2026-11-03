@@ -346,8 +346,10 @@ internal class StartGameHostPatch
             timer += Time.deltaTime;
         }
         thiz.SendClientReady();
+        GameStartProgress.HostPreparingOptions();
         yield return new WaitForSeconds(2f);
         if (!Current() || !OnGameJoinedPatch.IsCurrentSession(generation) || !SyncInitialGameOptions()) yield break;
+        GameStartProgress.HostAssigningRoles();
         yield return AssignRoles();
         //ShipStatus.Instance.Begin(); // Tasks sets in IntroPatch
         yield break;
@@ -574,6 +576,7 @@ internal class StartGameHostPatch
         if (officialDistribution)
         {
             yield return RoleDistribution.Publish();
+            if (RoleDistribution.RestoreComplete) GameStartProgress.HostRolesAssigned();
             yield break;
         }
 
@@ -590,6 +593,7 @@ internal class StartGameHostPatch
         SetRoleSelf();
 
         RpcSetRoleReplacer.EndReplace();
+        GameStartProgress.HostRolesAssigned();
         yield break;
     }
 

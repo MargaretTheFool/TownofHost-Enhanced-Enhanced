@@ -12,6 +12,7 @@ internal static class OfficialAnticheatLifecyclePatch
 {
     internal static void ResetOperations(bool preserveCapabilities = false)
     {
+        GameStartProgress.Reset();
         AntiBlackout.Reset();
         RoleDistribution.Reset();
         RpcSetRoleReplacer.RoleMap.Clear();
@@ -56,6 +57,8 @@ internal static class OfficialAnticheatLifecyclePatch
     {
         // CoStartGame only constructs its native iterator. Freeze when Unity
         // actually advances it, and ignore an unstarted iterator from an old room.
+        var round = default(OfficialSessionContext);
+        bool progressStarted = false, finished = false;
         try
         {
             if (!context.IsCurrent()) yield break;
@@ -64,10 +67,27 @@ internal static class OfficialAnticheatLifecyclePatch
             // Initialize after the context changes, never at iterator construction:
             // initialization sends must belong to the round they initialize.
             ChangeRoleSettings.Initialize(AmongUsClient.Instance);
-            var round = OfficialSessionContext.Capture();
-            while (round.IsCurrent() && original.MoveNext()) yield return original.Current;
+            round = OfficialSessionContext.Capture();
+            progressStarted = true;
+            GameStartProgress.Begin(round);
+            while (round.IsCurrent())
+            {
+                if (!original.MoveNext())
+                {
+                    finished = true;
+                    break;
+                }
+                yield return original.Current;
+            }
         }
-        finally { original.TryCast<Il2CppSystem.IDisposable>()?.Dispose(); }
+        finally
+        {
+            try
+            {
+                if (progressStarted) GameStartProgress.End(round, finished);
+            }
+            finally { original.TryCast<Il2CppSystem.IDisposable>()?.Dispose(); }
+        }
     }
 
     [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.OnGameEnd))]
