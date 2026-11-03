@@ -274,6 +274,9 @@ public abstract class OptionItem
     {
         CurrentPreset = Math.Clamp(newPreset, 0, NumPresets - 1);
 
+        if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost && GameStates.IsHideNSeek)
+            ServerLimits.NormalizeHideNSeekImpostors(GameOptionsManager.Instance.CurrentGameOptions.MaxPlayers, doSave: false, doSync: false);
+
         foreach (var op in AllOptions.ToArray())
             op.Refresh();
 

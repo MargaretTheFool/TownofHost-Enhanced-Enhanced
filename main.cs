@@ -66,7 +66,7 @@ public class Main : BasePlugin
     public static readonly string GitHubInviteUrl = "https://github.com/Niko-s-Impostor-Server/TownofHost-Enhanced-Enhanced";
 
     public static readonly bool ShowWebsiteButton = true;
-    public static readonly string WebsiteUrl = "https://au.niko233.top";
+    public static readonly string WebsiteUrl = "https://tohee.niko233.top/";
 
     public static readonly bool ShowDiscordButton = true;
     public static readonly string DiscordInviteUrl = "https://au.niko233.top/discord";
@@ -621,8 +621,6 @@ public class Main : BasePlugin
         CustomRpcTransport.Register();
 
         Harmony.PatchAll();
-
-        if (DebugModeManager.AmDebugger) ConsoleManager.CreateConsole();
 
         TOHE.Logger.Msg("========= TOHE loaded! =========", "Plugin Load");
     }

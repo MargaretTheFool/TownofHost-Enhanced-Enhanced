@@ -33,10 +33,13 @@ internal static class CloudService
     private static int sessionGame;
     private static int sessionHost = -1;
     private static uint sessionGeneration;
+    private static uint roomGeneration;
+    private static uint endedGeneration;
     private static bool privateConfirmed;
     private static bool roomManuallyStopped;
     private static string sessionRoomKey;
     private static bool wasPublic;
+    private static bool roundEnded;
     private static int gameVersion;
     private static bool snapshotUnavailable;
     private static bool bindingOpened;
@@ -184,6 +187,13 @@ internal static class CloudService
             if (sessionHost != -1) Disconnect();
             return;
         }
+        // JoinGame temporarily clears ClientId when returning from the end screen.
+        if (roundEnded && sessionGame == client.GameId && client.IsGameOver && client.ClientId < 0) return;
+        if (roundEnded && sessionGame == client.GameId && !client.IsGameOver && client.AmHost)
+        {
+            sessionHost = client.HostId;
+            sessionGeneration = OnGameJoinedPatch.Generation;
+        }
         if (sessionHost != client.HostId || sessionGame != client.GameId || sessionGeneration != OnGameJoinedPatch.Generation)
         {
             bool sameRoom = sessionHost != -1 && sessionGame == client.GameId
@@ -199,9 +209,17 @@ internal static class CloudService
             sessionHost = client.HostId;
             sessionGame = client.GameId;
             sessionGeneration = OnGameJoinedPatch.Generation;
+            roomGeneration = sessionGeneration;
             wasPublic = client.IsGamePublic;
             gameVersion = Constants.GetBroadcastVersion();
         }
+        if (client.IsGameOver && client.AmHost && !roundEnded)
+        {
+            roundEnded = true;
+            endedGeneration = sessionGeneration;
+        }
+        if (roundEnded && !client.IsGameOver && sessionGeneration != endedGeneration
+            && PlayerControl.LocalPlayer && PlayerControl.LocalPlayer.Data != null) roundEnded = false;
         if (wasPublic && !client.IsGamePublic) privateConfirmed = false;
         wasPublic = client.IsGamePublic;
         if (!client.AmHost || token == null || puid == null || !ShareEnabled
@@ -211,7 +229,8 @@ internal static class CloudService
             if (!client.AmHost || !ShareEnabled || roomManuallyStopped || (!client.IsGamePublic && !privateConfirmed)) CloudRooms.Stop();
             return;
         }
-        if (!CloudRooms.TrySnapshot(client, gameVersion, CloudAccount.Current.Regions, out string snapshot, out string roomKey))
+        if (!CloudRooms.TrySnapshot(client, gameVersion, roomGeneration, CloudAccount.Current.Regions,
+                out string snapshot, out string roomKey))
         {
             CloudRooms.Stop();
             if (!snapshotUnavailable)
@@ -234,6 +253,7 @@ internal static class CloudService
         roomManuallyStopped = false;
         sessionRoomKey = null;
         wasPublic = false;
+        roundEnded = false;
         snapshotUnavailable = false;
     }
 

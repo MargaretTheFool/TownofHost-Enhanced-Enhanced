@@ -67,7 +67,7 @@ internal static class CloudRooms
     private static Uri unauthorizedOrigin;
     private static string unauthorizedToken;
 
-    internal static bool TrySnapshot(AmongUsClient client, int gameVersion, IReadOnlyList<CloudAccount.Region> regions,
+    internal static bool TrySnapshot(AmongUsClient client, int gameVersion, uint generation, IReadOnlyList<CloudAccount.Region> regions,
         out string json, out string roomKey)
     {
         json = roomKey = null;
@@ -105,12 +105,11 @@ internal static class CloudRooms
         }
 
         string code = GameCode.IntToGameName(client.GameId);
-        var player = PlayerControl.LocalPlayer;
         var options = GameOptionsManager.Instance?.CurrentGameOptions;
         if ((!GameStates.IsLobby && !client.IsGameStarted && !client.IsGameOver)
-            || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(code) || !player || player.Data == null || options == null
+            || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(code) || options == null
             || client.allClients.Count > options.MaxPlayers) return false;
-        string hostName = Main.AllPlayerNames.TryGetValue(player.PlayerId, out var realName) ? realName : player.Data.PlayerName;
+        string hostName = DataManager.Player.Customization.Name;
         hostName = new string((hostName ?? string.Empty).RemoveHtmlTags().Where(c => !char.IsControl(c)).ToArray()).Trim();
         if (hostName.Length > 64)
         {
@@ -129,7 +128,7 @@ internal static class CloudRooms
             mods = new[] { new { id = Main.PluginGuid, version = Main.PluginVersion, display_version = Main.PluginDisplayVersion, flags = 0 } }
         };
         json = JsonSerializer.Serialize(new { game, region = new { id, name, url = matchmaker.AbsoluteUri } });
-        roomKey = $"{client.GameId}:{OnGameJoinedPatch.Generation}:{matchmaker.AbsoluteUri}";
+        roomKey = $"{client.GameId}:{generation}:{matchmaker.AbsoluteUri}";
         return true;
     }
 

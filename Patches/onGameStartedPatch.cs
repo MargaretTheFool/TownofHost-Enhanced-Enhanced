@@ -35,7 +35,8 @@ internal class ChangeRoleSettings
             // Note: No positions are set at this time.
             if (GameStates.IsHideNSeek)
             {
-                Main.HideNSeekOptions.NumImpostors = Options.NumImpostorsHnS.GetInt();
+                if (__instance.AmHost) ServerLimits.NormalizeHideNSeekImpostors(Main.HideNSeekOptions.MaxPlayers);
+                Main.HideNSeekOptions.NumImpostors = Math.Min(Options.NumImpostorsHnS.GetInt(), Main.HideNSeekOptions.MaxPlayers / 2);
                 Main.AliveImpostorCount = Main.HideNSeekOptions.NumImpostors;
             }
 

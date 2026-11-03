@@ -69,8 +69,13 @@ public static class OptionShower
         return CurrentText();
     }
 
-    private static string GetVanillaSettings() => GameOptionsManager.Instance.CurrentGameOptions
-        .ToHudString(GameData.Instance ? GameData.Instance.PlayerCount : 10);
+    private static string GetVanillaSettings()
+    {
+        string label = DestroyableSingleton<TranslationController>.Instance.GetString(StringNames.GameConfirmImpostor) + ": ";
+        return string.Join("\n", GameOptionsManager.Instance.CurrentGameOptions
+            .ToHudString(GameData.Instance ? GameData.Instance.PlayerCount : 10).Split('\n')
+            .Where(line => !line.StartsWith(label, StringComparison.Ordinal)));
+    }
 
     private static void Rebuild(string vanilla, int language, bool hidden, bool host)
     {

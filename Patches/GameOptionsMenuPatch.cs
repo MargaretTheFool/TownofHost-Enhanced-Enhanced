@@ -17,6 +17,13 @@ public static class ModGameOptionsMenu
     public static Il2CppSystem.Collections.Generic.Dictionary<int, OptionBehaviour> BehaviourList = new();
     public static Il2CppSystem.Collections.Generic.Dictionary<int, CategoryHeaderMasked> CategoryHeaderList = new();
 }
+
+[HarmonyPatch(typeof(MatchInfoGuide), nameof(MatchInfoGuide.CreateSettingsEntry))]
+internal static class MatchInfoGuideSettingsPatch
+{
+    private static bool Prefix([HarmonyArgument(0)] StringNames settingName) => settingName != StringNames.GameConfirmImpostor;
+}
+
 [HarmonyPatch(typeof(GameOptionsMenu))]
 public static class GameOptionsMenuPatch
 {
@@ -128,6 +135,9 @@ public static class GameOptionsMenuPatch
     public static void OpenModMenu(GameOptionsMenu menu)
     {
         if (!TryGetTab(menu, out _) || Builds.ContainsKey(menu.GetInstanceID()) || menu.ControllerSelectable.Count == 0) return;
+        foreach (var child in menu.Children.ToArray())
+            if (ModGameOptionsMenu.OptionList.TryGetValue(child, out var index) && OptionItem.AllOptions[index] == Options.NumImpostorsHnS)
+                child.Initialize();
         ControllerManager.Instance.OpenOverlayMenu(menu.name, menu.BackButton, menu.ControllerSelectable[0], menu.ControllerSelectable);
     }
     [HarmonyPatch(nameof(GameOptionsMenu.Initialize)), HarmonyPrefix]
@@ -149,6 +159,10 @@ public static class GameOptionsMenuPatch
     [HarmonyPatch(nameof(GameOptionsMenu.Initialize)), HarmonyPostfix]
     private static void InitializePostfix(GameOptionsMenu __instance)
     {
+        if (!TryGetTab(__instance, out _) && __instance.Children != null)
+            foreach (var child in __instance.Children.ToArray())
+                if (child.Title == StringNames.GameNumImpostors) child.Initialize();
+
         var optionMenu = GameObject.Find("PlayerOptionsMenu(Clone)");
         optionMenu?.transform.FindChild("Background")?.gameObject.SetActive(false);
 
@@ -445,10 +459,41 @@ public static class GameOptionsMenuPatch
         }, 0.28f, "Change Tab");
 
     }
+    [HarmonyPatch(nameof(GameOptionsMenu.CreateSettings)), HarmonyPostfix]
+    private static void CreateSettingsPostfix(GameOptionsMenu __instance)
+    {
+        if (TryGetTab(__instance, out _)) return;
+        foreach (var option in __instance.Children.ToArray())
+        {
+            if (option.Title != StringNames.GameConfirmImpostor) continue;
+            float y = option.transform.localPosition.y;
+            option.gameObject.SetActive(false);
+            __instance.Children.Remove(option);
+            foreach (var child in __instance.Children.ToArray())
+                if (child.transform.parent == __instance.settingsContainer && child.transform.localPosition.y < y)
+                    child.transform.localPosition += new Vector3(0f, 0.45f, 0f);
+            foreach (var header in __instance.settingsContainer.GetComponentsInChildren<CategoryHeaderMasked>())
+                if (header != __instance.categoryHeaderOrigin && header.transform.localPosition.y < y)
+                    header.transform.localPosition += new Vector3(0f, 0.45f, 0f);
+            __instance.scrollBar.SetYBoundsMax(__instance.scrollBar.GetYBounds().max - 0.45f);
+            RebuildNavigation(__instance);
+            break;
+        }
+    }
+
     [HarmonyPatch(nameof(GameOptionsMenu.ValueChanged)), HarmonyPrefix]
     private static bool ValueChangedPrefix(GameOptionsMenu __instance, OptionBehaviour option)
     {
-        if (!TryGetTab(__instance, out _)) return true;
+        if (!TryGetTab(__instance, out _))
+        {
+            if (option.TryCast<NumberOption>()?.intOptionName == AmongUs.GameOptions.Int32OptionNames.MaxPlayers)
+            {
+                ServerLimits.Normalize(GameOptionsManager.Instance.CurrentGameOptions);
+                foreach (var child in __instance.Children.ToArray())
+                    if (child.Title == StringNames.GameNumImpostors) child.Initialize();
+            }
+            return true;
+        }
 
         if (ModGameOptionsMenu.OptionList.TryGetValue(option, out var index))
         {
@@ -657,7 +702,7 @@ public static class NumberOptionPatch
                 break;
             case StringNames.GameNumImpostors:
                 __instance.ValidRange.min = ServerLimits.MinImpostors;
-                __instance.ValidRange.max = ServerLimits.MaxImpostors;
+                __instance.ValidRange.max = ServerLimits.MaxImpostors(GameOptionsManager.Instance.CurrentGameOptions.MaxPlayers);
                 break;
         }
 
@@ -670,6 +715,12 @@ public static class NumberOptionPatch
         if (ModGameOptionsMenu.OptionList.TryGetValue(__instance, out var index))
         {
             var item = OptionItem.AllOptions[index];
+            if (item == Options.NumImpostorsHnS && GameStates.IsHideNSeek)
+            {
+                int players = GameOptionsManager.Instance.CurrentGameOptions.MaxPlayers;
+                if (GameOptionsMenuPatch.CanEdit) ServerLimits.NormalizeHideNSeekImpostors(players);
+                __instance.ValidRange.max = Math.Min(3, players / 2);
+            }
             __instance.TitleText.text = item.GetName();
             __instance.Value = item.GetFloat();
             __instance.ValueText.text = item.GetString();
