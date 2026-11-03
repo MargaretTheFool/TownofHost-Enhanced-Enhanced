@@ -143,6 +143,8 @@ class FixedUpdateInHidenSeekPatch
         if (!lowLoad)
         {
             Zoom.OnFixedUpdate();
+            if (GameStates.IsHideNSeek && (GameStates.IsLobby || GameStates.IsInGame))
+                PlayerIdentifiers.UpdateHideAndSeekName(player);
         }
 
         if (!AmongUsClient.Instance.AmHost) return Task.CompletedTask;
@@ -219,5 +221,17 @@ class FixedUpdateInHidenSeekPatch
             Utils.ApplySuffix(__instance);
 
         return Task.CompletedTask;
+    }
+}
+
+[HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.SetName))]
+class SetNameInHideAndSeekPatch
+{
+    public static void Postfix(PlayerControl __instance)
+    {
+        if (!AmongUsClient.Instance.AmHost || !GameStates.IsHideNSeek || !GameStates.IsInGame ||
+            !Main.IntroDestroyed || !PlayerIdentifiers.Shows(false, false)) return;
+
+        _ = new LateTask(() => PlayerIdentifiers.RefreshLobby(target: __instance, force: true, hideAndSeek: true), 0.5f, "Refresh hide and seek player ID");
     }
 }
