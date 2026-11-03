@@ -92,6 +92,7 @@ try {
     $packages = @()
     New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
     Copy-Item -LiteralPath $dll -Destination (Join-Path $OutputDirectory 'TOHE.dll')
+    Copy-Item -LiteralPath (Join-Path $packaging 'LICENSE.Overloaded.txt') -Destination (Join-Path $OutputDirectory 'LICENSE.Overloaded.txt')
     foreach ($arch in @('x64', 'x86')) {
         $stage = Join-Path $work $arch
         [IO.Compression.ZipFile]::ExtractToDirectory($runtimeArchives[$arch], $stage)
@@ -113,6 +114,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $packaging 'BepInEx.cfg'), (Join-Path $packaging 'at.duikbo.regioninstall.cfg') -Destination $config
         Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENSE') -Destination (Join-Path $stage 'LICENSE.TOHEE.txt')
         Copy-Item -LiteralPath (Join-Path $packaging 'LICENSE.RemoveGcMaxTimeSlice.txt') -Destination (Join-Path $stage 'LICENSE.RemoveGcMaxTimeSlice.txt')
+        Copy-Item -LiteralPath (Join-Path $packaging 'LICENSE.Overloaded.txt') -Destination (Join-Path $stage 'LICENSE.Overloaded.txt')
         $platforms = if ($arch -eq 'x64') { 'Steam / Epic Games / Microsoft Store' } else { 'itch.io' }
         $suffix = if ($arch -eq 'x64') { 'Steam-Epic-Games-Microsoft-Store_x64' } else { 'itch.io_x86' }
         if ($arch -eq 'x64') { [IO.File]::WriteAllText((Join-Path $stage 'steam_appid.txt'), "945360`n") }

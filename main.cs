@@ -33,6 +33,8 @@ namespace TOHE;
 [BepInIncompatibility("com.discussions.LotusContinued")]
 [BepInIncompatibility("com.0xdrmoe.townofhostenhanced")]
 [BepInIncompatibility("com.bhr.bedderhostroles")]
+[BepInIncompatibility("dev.allofus.overloaded")]
+[BepInIncompatibility("xyz.crowdedmods.crowdedmod")]
 [BepInProcess("Among Us.exe")]
 public class Main : BasePlugin
 {
