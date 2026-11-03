@@ -1,3 +1,4 @@
+# This readme is outdated. Currently too busy messing up around other things. Will rework on this later.
 
 <h1 align="center">Town of Host: Enhanced (TOHE)</h1>
 
