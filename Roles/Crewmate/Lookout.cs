@@ -30,7 +30,7 @@ internal class Lookout : RoleBase
 
     public override string GetMark(PlayerControl seer, PlayerControl seen, bool isForMeeting = false)
     {
-        if (!seer.IsAlive() || !seen.IsAlive()) return string.Empty;
+        if (TOHE.Modules.PlayerIdentifiers.Manages(seer.IsModded()) || !seer.IsAlive() || !seen.IsAlive()) return string.Empty;
 
         return ColorString(GetRoleColor(CustomRoles.Lookout), $" {seen.Data.PlayerId}");
     }

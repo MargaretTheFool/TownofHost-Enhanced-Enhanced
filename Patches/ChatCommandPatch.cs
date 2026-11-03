@@ -479,44 +479,9 @@ internal class ChatCommands
                 case "/vote":
                 case "/投票":
                 case "/票":
-                    subArgs = args.Length != 2 ? "" : args[1];
-                    if (subArgs == "" || !int.TryParse(subArgs, out int arg))
-                        break;
-                    var plr = Utils.GetPlayerById(arg);
-
-                    if (GameStates.IsLobby)
-                    {
-                        Utils.SendMessage(GetString("Message.CanNotUseInLobby"), PlayerControl.LocalPlayer.PlayerId);
-                        break;
-                    }
-
-                    if (!Options.EnableVoteCommand.GetBool())
-                    {
-                        Utils.SendMessage(GetString("VoteDisabled"), PlayerControl.LocalPlayer.PlayerId);
-                        break;
-                    }
                     if (Options.ShouldVoteCmdsSpamChat.GetBool())
-                    {
                         canceled = true;
-                    }
-
-                    if (arg != 253) // skip
-                    {
-                        if (plr == null || !plr.IsAlive())
-                        {
-                            Utils.SendMessage(GetString("VoteDead"), PlayerControl.LocalPlayer.PlayerId);
-                            break;
-                        }
-                    }
-                    if (!PlayerControl.LocalPlayer.IsAlive())
-                    {
-                        Utils.SendMessage(GetString("CannotVoteWhenDead"), PlayerControl.LocalPlayer.PlayerId);
-                        break;
-                    }
-                    if (GameStates.IsMeeting)
-                    {
-                        PlayerControl.LocalPlayer.RpcCastVote((byte)arg);
-                    }
+                    VoteCommand.Handle(PlayerControl.LocalPlayer, args);
                     break;
 
                 case "/d":
@@ -2235,46 +2200,12 @@ internal class ChatCommands
             case "/vote":
             case "/投票":
             case "/票":
-                subArgs = args.Length != 2 ? "" : args[1];
-                if (subArgs == "" || !int.TryParse(subArgs, out int arg))
-                    break;
-                var plr = Utils.GetPlayerById(arg);
-
-                if (GameStates.IsLobby)
-                {
-                    Utils.SendMessage(GetString("Message.CanNotUseInLobby"), player.PlayerId);
-                    break;
-                }
-
-
-                if (!Options.EnableVoteCommand.GetBool())
-                {
-                    Utils.SendMessage(GetString("VoteDisabled"), player.PlayerId);
-                    break;
-                }
                 if (Options.ShouldVoteCmdsSpamChat.GetBool())
                 {
                     canceled = true;
                     ChatManager.SendPreviousMessagesToAll();
                 }
-
-                if (arg != 253) // skip
-                {
-                    if (plr == null || !plr.IsAlive())
-                    {
-                        Utils.SendMessage(GetString("VoteDead"), player.PlayerId);
-                        break;
-                    }
-                }
-                if (!player.IsAlive())
-                {
-                    Utils.SendMessage(GetString("CannotVoteWhenDead"), player.PlayerId);
-                    break;
-                }
-                if (GameStates.IsMeeting)
-                {
-                    player.RpcCastVote((byte)arg);
-                }
+                VoteCommand.Handle(player, args);
                 break;
 
             case "/rps":

@@ -222,7 +222,7 @@ internal class Nemesis : RoleBase
     {
         seen ??= seer;
 
-        if (!seer.IsAlive() && seen.IsAlive())
+        if (!PlayerIdentifiers.Manages(seer.IsModded()) && !seer.IsAlive() && seen.IsAlive())
             return Utils.ColorString(Utils.GetRoleColor(CustomRoles.Nemesis), " " + seen.PlayerId.ToString()) + " ";
 
         return string.Empty;

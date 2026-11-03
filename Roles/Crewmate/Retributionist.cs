@@ -54,7 +54,7 @@ internal class Retributionist : RoleBase
     {
         seen ??= seer;
 
-        if (!seer.IsAlive() && seen.IsAlive())
+        if (!PlayerIdentifiers.Manages(seer.IsModded()) && !seer.IsAlive() && seen.IsAlive())
             return ColorString(GetRoleColor(CustomRoles.Retributionist), " " + seen.PlayerId.ToString()) + " ";
 
         return string.Empty;

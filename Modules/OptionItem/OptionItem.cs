@@ -278,6 +278,7 @@ public abstract class OptionItem
             op.Refresh();
 
         if (doSync) SyncAllOptions();
+        PlayerIdentifiers.RefreshLobby();
     }
     public static void SetRemotePreset(bool active)
     {

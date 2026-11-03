@@ -371,6 +371,8 @@ internal class RPCHandlerPatch
                     }
 
                     Main.playerVersion[joiningClientId] = new PlayerVersion(version, tag, forkId);
+                    if (!hadVersion && AmongUsClient.Instance.AmHost && GameStates.IsLobby)
+                        PlayerIdentifiers.RefreshLobby(seer: __instance);
 
                     if (Main.VersionCheat.Value && joiningClientId == AmongUsClient.Instance.HostId) RPC.RpcVersionCheck();
 

@@ -612,6 +612,11 @@ class InnerNetClientSpawnPatch
             {
                 if (Main.OverrideWelcomeMsg != "") Utils.SendMessage(Main.OverrideWelcomeMsg, client.Character.PlayerId);
                 else TemplateManager.SendTemplate("welcome", client.Character.PlayerId, true);
+                if (GameStates.IsLobby && PlayerIdentifiers.Shows(false, false))
+                {
+                    PlayerIdentifiers.RefreshLobby(target: client.Character);
+                    if (!client.Character.IsModded()) PlayerIdentifiers.RefreshLobby(seer: client.Character);
+                }
             }, 3f, "Welcome Message");
 
             _ = Schedule(() =>

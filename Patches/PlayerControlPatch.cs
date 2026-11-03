@@ -1235,8 +1235,11 @@ class FixedUpdateInNormalGamePatch
                     {
                         __instance.cosmetics.nameText.text = $"<color=#0dff00>{__instance.name}</color>";
                     }
+                    else __instance.cosmetics.nameText.text = __instance?.Data?.PlayerName;
                 }
                 else __instance.cosmetics.nameText.text = __instance?.Data?.PlayerName;
+                if (PlayerIdentifiers.Shows(true, false))
+                    __instance.cosmetics.nameText.text = PlayerIdentifiers.Prefix(__instance.PlayerId, __instance.cosmetics.nameText.text);
             }
             if (GameStates.IsInGame)
             {
@@ -1294,6 +1297,8 @@ class FixedUpdateInNormalGamePatch
                 }
 
                 RealName = RealName.ApplyNameColorData(seer, target, false);
+                if (PlayerIdentifiers.Shows(true, false))
+                    RealName = PlayerIdentifiers.Prefix(target.PlayerId, RealName);
                 var seerRole = seer.GetCustomRole();
 
                 // Add protected player icon from ShieldPersonDiedFirst

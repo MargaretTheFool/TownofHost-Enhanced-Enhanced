@@ -198,6 +198,8 @@ public static class Options
 
     public static OptionItem EnableVoteCommand;
     public static OptionItem ShouldVoteCmdsSpamChat;
+    public static OptionItem PlayerIdAudience;
+    public static OptionItem PlayerIdPeriod;
 
     //public static OptionItem ShowLobbyCode;
     public static OptionItem LowLoadMode;
@@ -1801,6 +1803,13 @@ public static class Options
         ShouldVoteCmdsSpamChat = BooleanOptionItem.Create(60747, "ShouldVoteSpam", false, TabGroup.ModSettings, false)
             .SetParent(EnableVoteCommand)
             .SetGameMode(CustomGameMode.Standard);
+        PlayerIdAudience = StringOptionItem.Create(60748, "PlayerIdAudience",
+            ["PlayerIdAudience.Off", "PlayerIdAudience.Vanilla", "PlayerIdAudience.All"], 0, TabGroup.ModSettings, false)
+            .RegisterUpdateValueEvent((_, args) => { if (args.BeforeValue != args.CurrentValue) PlayerIdentifiers.RefreshLobby(); });
+        PlayerIdPeriod = StringOptionItem.Create(60749, "PlayerIdPeriod",
+            ["PlayerIdPeriod.OutsideMeeting", "PlayerIdPeriod.Meeting", "PlayerIdPeriod.Always"], 2, TabGroup.ModSettings, false)
+            .SetParent(PlayerIdAudience)
+            .RegisterUpdateValueEvent((_, args) => { if (args.BeforeValue != args.CurrentValue) PlayerIdentifiers.RefreshLobby(); });
         // 其它设定
         TextOptionItem.Create(10000031, "MenuTitle.Other", TabGroup.ModSettings)
             .HideInFFA()

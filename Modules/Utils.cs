@@ -1655,7 +1655,11 @@ public static class Utils
         {
             string realName = Main.AllPlayerNames.TryGetValue(player.PlayerId, out var namePlayer) ? namePlayer : "";
             if (GameStates.IsLobby && realName != player.name && player.CurrentOutfitType == PlayerOutfitType.Default)
+            {
                 player.RpcSetName(realName);
+                if (PlayerIdentifiers.Shows(false, false))
+                    _ = new LateTask(() => PlayerIdentifiers.RefreshLobby(target: player, force: true), 0.5f, "Refresh lobby player ID");
+            }
         }
 
         string name = Main.AllPlayerNames.TryGetValue(player.PlayerId, out var n) ? n : "";
@@ -1698,7 +1702,11 @@ public static class Utils
 
         // Set name
         if (name != player.name && player.CurrentOutfitType == PlayerOutfitType.Default)
+        {
             player.RpcSetName(name);
+            if (PlayerIdentifiers.Shows(false, false))
+                _ = new LateTask(() => PlayerIdentifiers.RefreshLobby(target: player, force: true), 0.5f, "Refresh lobby player ID");
+        }
     }
     public static bool CheckCamoflague(this PlayerControl PC) => Camouflage.IsCamouflage || Camouflager.AbilityActivated || Utils.IsActive(SystemTypes.MushroomMixupSabotage)
         || (Main.CheckShapeshift.TryGetValue(PC.PlayerId, out bool isShapeshifitng) && isShapeshifitng);
@@ -1952,6 +1960,8 @@ public static class Utils
                 // ====== Get SeerRealName ======
 
                 string SeerRealName = seer.GetRealName(isForMeeting);
+                if (PlayerIdentifiers.Shows(false, isForMeeting))
+                    SeerRealName = PlayerIdentifiers.Prefix(seer.PlayerId, SeerRealName);
 
                 // ====== Combine SelfRoleName, SelfTaskText, SelfName, SelfDeathReason for seer ======
                 string SelfTaskText = GetProgressText(seer);
@@ -2101,12 +2111,13 @@ public static class Utils
 
                         string TargetPlayerName = target.GetRealName(isForMeeting);
 
-                        var tempNameText = seer.GetRoleClass()?.NotifyPlayerName(seer, target, TargetPlayerName, isForMeeting);
+                        var tempNameText = PlayerIdentifiers.ReplacesRoleName(seer) ? string.Empty :
+                            seer.GetRoleClass()?.NotifyPlayerName(seer, target, TargetPlayerName, isForMeeting);
                         if (tempNameText != string.Empty)
                             TargetPlayerName = tempNameText;
 
                         // ========= Only During Meeting =========
-                        if (isForMeeting)
+                        if (isForMeeting && !PlayerIdentifiers.Manages(false))
                         {
                             // Guesser Mode is On ID
                             if (Options.GuesserMode.GetBool())
@@ -2157,6 +2168,8 @@ public static class Utils
                         }
 
                         TargetPlayerName = TargetPlayerName.ApplyNameColorData(seer, target, isForMeeting);
+                        if (PlayerIdentifiers.Shows(false, isForMeeting))
+                            TargetPlayerName = PlayerIdentifiers.Prefix(target.PlayerId, TargetPlayerName);
 
                         // ====== Add TargetSuffix for target (TargetSuffix visible ​​only to the seer) ======
                         TargetSuffix.Clear();

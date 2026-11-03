@@ -2,6 +2,7 @@ using AmongUs.GameOptions;
 using System;
 using System.Text;
 using TMPro;
+using TOHE.Modules;
 using TOHE.Roles.AddOns.Common;
 using TOHE.Roles.AddOns.Crewmate;
 using TOHE.Roles.AddOns.Impostor;
@@ -304,7 +305,7 @@ class CheckForEndVotingPatch
             if (tie)
             {
                 byte targetId = byte.MaxValue;
-                foreach (var data in VotingData.Where(x => x.Key < 15 && x.Value == max).ToArray())
+                foreach (var data in VotingData.Where(x => x.Key < 252 && x.Value == max && GetPlayerById(x.Key) != null).ToArray())
                 {
                     if (Tiebreaker.VoteFor.Contains(data.Key))
                     {
@@ -335,7 +336,7 @@ class CheckForEndVotingPatch
                         exiledPlayer = GameData.Instance.AllPlayers.ToArray().FirstOrDefault(info => info.PlayerId == exileId);
                         break;
                     case TieMode.All:
-                        var exileIds = VotingData.Where(x => x.Key < 15 && x.Value == max).Select(kvp => kvp.Key).ToArray();
+                        var exileIds = VotingData.Where(x => x.Key < 252 && x.Value == max && GetPlayerById(x.Key) != null).Select(kvp => kvp.Key).ToArray();
                         foreach (var playerId in exileIds)
                             GetPlayerById(playerId).SetRealKiller(null);
                         TryAddAfterMeetingDeathPlayers(PlayerState.DeathReason.Vote, exileIds);
@@ -621,6 +622,9 @@ class CastVotePatch
         if (!AmongUsClient.Instance.AmHost) return true;
         var voter = GetPlayerById(srcPlayerId.Value);
         if (voter == null || !voter.IsAlive()) return false;
+        var voterArea = __instance.playerStates.FirstOrDefault(area => area.PlayerId.Value == voter.PlayerId);
+        if (voterArea == null || voterArea.AmDead || voterArea.DidVote ||
+            VoteCommand.PendingClears.ContainsKey((__instance.Pointer, voter.GetClientId()))) return false;
 
         var target = GetPlayerById(suspectPlayerId.Value);
         if (target == null && suspectPlayerId.Value < 253)
@@ -942,6 +946,7 @@ class MeetingHudStartPatch
     }
     public static void Prefix(/*MeetingHud __instance*/)
     {
+        VoteCommand.PendingClears.Clear();
         Logger.Info("------------Opening of the session------------", "Phase");
         ChatUpdatePatch.DoBlockChat = true;
         GameStates.AlreadyDied |= !IsAllAlive;
@@ -1130,11 +1135,13 @@ class MeetingHudStartPatch
                     sb.Append(ColorString(GetRoleColor(CustomRoles.Impostor), "★"));
             }
 
-            var tempNemeText = seer.GetRoleClass().PVANameText(pva, seer, target);
+            var tempNemeText = PlayerIdentifiers.ReplacesRoleName(seer) ? string.Empty : seer.GetRoleClass().PVANameText(pva, seer, target);
             if (tempNemeText != string.Empty)
             {
                 pva.NameText.text = tempNemeText;
             }
+            if (PlayerIdentifiers.Shows(true, true))
+                pva.NameText.text = PlayerIdentifiers.Prefix(target.PlayerId, pva.NameText.text);
 
             //foreach (var SeerSubRole in seer.GetCustomSubRoles().ToArray())
             //{
