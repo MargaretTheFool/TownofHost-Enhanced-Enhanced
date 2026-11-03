@@ -344,8 +344,6 @@ public class GameSettingMenuPatch
             !OptionItem.FastOptions.TryGetValue(OptionItem.PresetId, out var preset)) return;
         var previousMode = Options.CurrentGameMode;
         preset.SetValue(preset.CurrentValue + delta);
-        menu.GameSettingsTab.RefreshChildren();
-        menu.RoleSettingsTab.RefreshChildren();
         if (Options.GameMode.GetInt() == 2 && !GameStates.IsHideNSeek)
             Options.GameMode.SetValue(0);
         else if (Options.GameMode.GetInt() != 2 && GameStates.IsHideNSeek)

@@ -119,7 +119,6 @@ public class GameStartManagerPatch
         {
             if (__instance == null || LobbyBehaviour.Instance == null) return;
             LobbyBehaviourPatch.UpdateMusic(LobbyBehaviour.Instance);
-            TOHE.Modules.VanillaPresetOptions.InitializeLobby();
             minWait = Options.MinWaitAutoStart.GetFloat();
             maxWait = Options.MaxWaitAutoStart.GetFloat();
             minPlayer = Options.PlayerAutoStart.GetInt();
