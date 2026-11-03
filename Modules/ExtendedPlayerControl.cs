@@ -908,15 +908,8 @@ static class ExtendedPlayerControl
 
     public static ClientData GetClient(this PlayerControl player)
     {
-        try
-        {
-            var client = AmongUsClient.Instance.allClients.ToArray().FirstOrDefault(cd => cd.Character.PlayerId == player.PlayerId);
-            return client;
-        }
-        catch
-        {
-            return null;
-        }
+        if (player == null || AmongUsClient.Instance == null) return null;
+        return AmongUsClient.Instance.allClients.ToArray().FirstOrDefault(cd => cd != null && cd.Character != null && cd.Character.PlayerId == player.PlayerId);
     }
     public static int GetClientId(this PlayerControl player)
     {
@@ -1094,11 +1087,15 @@ static class ExtendedPlayerControl
         }
         return isMeeting || player == null ? player?.Data?.PlayerName : player?.name;
     }
+    public static bool IsShieldedFromFirstDeath(this PlayerControl player) => MeetingStates.FirstMeeting
+        && !string.IsNullOrEmpty(Main.FirstDiedPrevious)
+        && player.GetClient().GetHashedPuid() == Main.FirstDiedPrevious;
+
     public static bool CanUseKillButton(this PlayerControl pc)
     {
         if (GameStates.IsLobby) return false;
         if (!pc.IsAlive() || Pelican.IsEaten(pc.PlayerId) || DollMaster.IsDoll(pc.PlayerId)) return false;
-        if (pc.GetClient().GetHashedPuid() == Main.FirstDiedPrevious && !Options.ShieldedCanUseKillButton.GetBool() && MeetingStates.FirstMeeting) return false;
+        if (pc.IsShieldedFromFirstDeath() && !Options.ShieldedCanUseKillButton.GetBool()) return false;
         if (pc.Is(CustomRoles.Killer) || Mastermind.PlayerIsManipulated(pc)) return true;
 
         var playerRoleClass = pc.GetRoleClass();

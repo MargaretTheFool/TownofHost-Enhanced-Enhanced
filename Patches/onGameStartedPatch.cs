@@ -54,6 +54,7 @@ internal class ChangeRoleSettings
             Main.LastEnteredVentLocation.Clear();
 
             Main.MurderedThisRound.Clear();
+            CheckMurderPatch.LastKillAttemptTime.Clear();
             Main.DesyncPlayerList.Clear();
             Main.PlayersDiedInMeeting.Clear();
             GuessManager.GuesserGuessed.Clear();
@@ -70,7 +71,7 @@ internal class ChangeRoleSettings
 
             Main.LastNotifyNames.Clear();
 
-            Main.FirstDiedPrevious = Options.ShieldPersonDiedFirst.GetBool() ? Main.FirstDied : "";
+            Main.FirstDiedPrevious = Options.ShieldPersonDiedFirst.GetBool() && Main.FirstDied != MurderPlayerPatch.UnknownFirstDeath ? Main.FirstDied : "";
             Main.FirstDied = "";
             Main.MadmateNum = 0;
             Main.BardCreations = 0;

@@ -67,18 +67,7 @@ class CheckProtectPatch
 [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.CheckMurder))]
 class CheckMurderPatch
 {
-    public static Dictionary<byte, float> TimeSinceLastKill = [];
-    public static void Update()
-    {
-        for (byte i = 0; i < 15; i++)
-        {
-            if (TimeSinceLastKill.ContainsKey(i))
-            {
-                TimeSinceLastKill[i] += Time.deltaTime;
-                if (15f < TimeSinceLastKill[i]) TimeSinceLastKill.Remove(i);
-            }
-        }
-    }
+    public static readonly Dictionary<byte, float> LastKillAttemptTime = [];
     public static bool Prefix(PlayerControl __instance, [HarmonyArgument(0)] PlayerControl target, bool __state = false)
     {
         if (!AmongUsClient.Instance.AmHost) return false;
@@ -179,15 +168,15 @@ class CheckMurderPatch
 
         var divice = Options.CurrentGameMode == CustomGameMode.FFA ? 3000f : 1500f;
         float minTime = Mathf.Max(0.02f, AmongUsClient.Instance.Ping / divice * 6f); //Ping value is milliseconds (ms), so ÷ 2000
-        // No value is stored in TimeSinceLastKill || Stored time is greater than or equal to minTime => Allow kill
+        // No previous attempt || enough time since the previous attempt => Allow kill
 
         //↓ If not permitted
-        if (TimeSinceLastKill.TryGetValue(killer.PlayerId, out var time) && time < minTime)
+        if (LastKillAttemptTime.TryGetValue(killer.PlayerId, out var lastAttempt) && Time.time - lastAttempt < minTime)
         {
-            Logger.Info($"Last kill was too shortly before, canceled - Ping: {AmongUsClient.Instance.Ping}, Time: {time}, MinTime: {minTime}", "CheckMurder");
+            Logger.Info($"Last kill was too shortly before, canceled - Ping: {AmongUsClient.Instance.Ping}, Time: {Time.time - lastAttempt}, MinTime: {minTime}", "CheckMurder");
             return false;
         }
-        TimeSinceLastKill[killer.PlayerId] = 0f;
+        LastKillAttemptTime[killer.PlayerId] = Time.time;
 
         // killable decision
         if (killer.PlayerId != target.PlayerId && !killer.CanUseKillButton() && checkCanUseKillButton)
@@ -256,7 +245,7 @@ class CheckMurderPatch
 
         Logger.Info($"Start", "FirstDied.CheckMurder");
 
-        if (target.GetClient().GetHashedPuid() == Main.FirstDiedPrevious && MeetingStates.FirstMeeting)
+        if (target.IsShieldedFromFirstDeath())
         {
             killer.SetKillCooldown(5f);
             killer.RpcGuardAndKill(target);
@@ -358,6 +347,9 @@ class CheckMurderPatch
 [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.MurderPlayer))]
 class MurderPlayerPatch
 {
+    // The first death has no PUID; the marker cannot match a hexadecimal PUID hash.
+    public const string UnknownFirstDeath = "?";
+
     public static bool Prefix(PlayerControl __instance, [HarmonyArgument(0)] PlayerControl target, [HarmonyArgument(1)] MurderResultFlags resultFlags, ref bool __state)
     {
         Logger.Info($"{__instance.GetNameWithRole().RemoveHtmlTags()} => {target.GetNameWithRole().RemoveHtmlTags()}{(target.IsProtected() ? "(Protected)" : "")}, flags : {resultFlags}", "MurderPlayer Prefix");
@@ -464,6 +456,7 @@ class MurderPlayerPatch
         if (Main.FirstDied == "")
         {
             Main.FirstDied = target.GetClient().GetHashedPuid();
+            if (Main.FirstDied == "") Main.FirstDied = UnknownFirstDeath;
 
             if (Options.RemoveShieldOnFirstDead.GetBool() && Main.FirstDiedPrevious != "")
             {
@@ -637,7 +630,7 @@ public static class CheckShapeshiftPatch
             Logger.Info("Checking while AntiBlackOut protect, shapeshift was canceled", "CheckShapeshift");
             return false;
         }
-        if (!(instance.Is(CustomRoles.ShapeshifterTOHE) || instance.Is(CustomRoles.Shapeshifter)) && target.GetClient().GetHashedPuid() == Main.FirstDiedPrevious && MeetingStates.FirstMeeting)
+        if (!(instance.Is(CustomRoles.ShapeshifterTOHE) || instance.Is(CustomRoles.Shapeshifter)) && target.IsShieldedFromFirstDeath())
         {
             instance.RpcGuardAndKill(instance);
             instance.Notify(Utils.ColorString(Utils.GetRoleColor(instance.GetCustomRole()), GetString("PlayerIsShieldedByGame")));
@@ -1304,7 +1297,7 @@ class FixedUpdateInNormalGamePatch
                 var seerRole = seer.GetCustomRole();
 
                 // Add protected player icon from ShieldPersonDiedFirst
-                if (target.GetClient().GetHashedPuid() == Main.FirstDiedPrevious && MeetingStates.FirstMeeting)
+                if (target.IsShieldedFromFirstDeath())
                 {
                     if (Options.ShowShieldedPlayerToAll.GetBool())
                     {

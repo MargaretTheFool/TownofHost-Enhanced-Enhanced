@@ -45,7 +45,7 @@ static class DoubleTrigger
             return true;
         }
         // Ignore kill interval when single action
-        CheckMurderPatch.TimeSinceLastKill.Remove(killer.PlayerId);
+        CheckMurderPatch.LastKillAttemptTime.Remove(killer.PlayerId);
         FirstTriggerTimer.Add(killer.PlayerId, 1f);
         FirstTriggerTarget.Add(killer.PlayerId, target.PlayerId);
         FirstTriggerAction.Add(killer.PlayerId, firstAction);

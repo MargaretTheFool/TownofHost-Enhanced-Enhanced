@@ -454,7 +454,6 @@ class ModManagerLateUpdatePatch
 
         CloudService.Tick();
         LateTask.Update(Time.deltaTime);
-        CheckMurderPatch.Update();
     }
     public static void Postfix(ModManager __instance)
     {

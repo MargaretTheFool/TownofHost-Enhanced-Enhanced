@@ -88,8 +88,8 @@ public static class BanManager
     }
     public static string GetHashedPuid(this ClientData player)
     {
-        if (player == null) return "";
-        string puid = player.ProductUserId;
+        string puid = player?.ProductUserId;
+        if (string.IsNullOrWhiteSpace(puid)) return "";
         using SHA256 sha256 = SHA256.Create();
 
         // get sha-256 hash
@@ -164,9 +164,10 @@ public static class BanManager
         if (!AmongUsClient.Instance.AmHost) return;
 
         string friendcode = player?.FriendCode;
+        string hashedPuid = player?.GetHashedPuid();
 
         // Check file BanList.txt
-        if (Options.ApplyBanList.GetBool() && CheckBanList(friendcode, player?.GetHashedPuid()))
+        if (Options.ApplyBanList.GetBool() && CheckBanList(friendcode, hashedPuid))
         {
             AmongUsClient.Instance.KickPlayer(player.Id, true);
             Logger.SendInGame(string.Format(GetString("Message.BannedByBanList"), player.PlayerName));
@@ -174,14 +175,14 @@ public static class BanManager
             return;
         }
         // Check EAC list from API
-        if (CheckEACList(friendcode, player?.GetHashedPuid()))
+        if (CheckEACList(friendcode, hashedPuid))
         {
             AmongUsClient.Instance.KickPlayer(player.Id, true);
             Logger.SendInGame(string.Format(GetString("Message.BannedByEACList"), player.PlayerName));
             Logger.Info($"{player.PlayerName} found in EAC block list, so player is banned", "BAN");
             return;
         }
-        if (TempBanWhiteList.Contains(player?.GetHashedPuid()))
+        if (!string.IsNullOrEmpty(hashedPuid) && TempBanWhiteList.Contains(hashedPuid))
         {
             AmongUsClient.Instance.KickPlayer(player.Id, true);
             //This should not happen
@@ -191,12 +192,11 @@ public static class BanManager
     }
     public static bool CheckBanList(string code, string hashedpuid = "")
     {
-        bool OnlyCheckPuid = false;
-        if (code == "" && hashedpuid != "") OnlyCheckPuid = true;
-        else if (code == "") return false;
+        bool OnlyCheckPuid = string.IsNullOrEmpty(code);
+        if (OnlyCheckPuid && string.IsNullOrEmpty(hashedpuid)) return false;
 
         string noDiscrim = "";
-        if (code.Contains('#'))
+        if (!OnlyCheckPuid && code.Contains('#'))
         {
             int index = code.IndexOf('#');
             noDiscrim = code[..index];
@@ -216,7 +216,7 @@ public static class BanManager
                     if (line.Contains(code)) return true;
                     if (!string.IsNullOrEmpty(noDiscrim) && !line.Contains('#') && line.Contains(noDiscrim)) return true;
                 }
-                if (line.Contains(hashedpuid)) return true;
+                if (!string.IsNullOrEmpty(hashedpuid) && line.Contains(hashedpuid)) return true;
             }
         }
         catch (Exception ex)
@@ -227,7 +227,7 @@ public static class BanManager
     }
     public static bool CheckEACList(string code, string hashedPuid)
     {
-        var splitCode = code.Split("#")[0].ToLower().Trim();
+        var splitCode = (code ?? "").Split("#")[0].ToLower().Trim();
         if (string.IsNullOrEmpty(splitCode) && string.IsNullOrEmpty(hashedPuid)) return false;
 
         foreach (var user in EACDict)
@@ -235,7 +235,7 @@ public static class BanManager
             var splitUser = user["friendcode"].ToString().Split('#')[0].ToLower().Trim();
 
             if ((!string.IsNullOrEmpty(splitCode) && (splitCode == splitUser))
-                || (user["hashPUID"].ToString().ToLower().Trim() == hashedPuid.ToLower().Trim()))
+                || (!string.IsNullOrEmpty(hashedPuid) && user["hashPUID"].ToString().ToLower().Trim() == hashedPuid.ToLower().Trim()))
             {
                 Logger.Warn($"friendcode : {code}, hashedPUID : {hashedPuid} banned by EAC reason : {user["reason"]}", "CheckEACList");
                 return true;

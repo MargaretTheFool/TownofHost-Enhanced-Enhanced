@@ -1961,7 +1961,7 @@ public static class Utils
                 string SelfName = $"{ColorString(seer.GetRoleColor(), SeerRealName)}{SelfDeathReason}{SelfMark}";
 
                 // Add protected player icon from ShieldPersonDiedFirst
-                if (seer.GetClient().GetHashedPuid() == Main.FirstDiedPrevious && MeetingStates.FirstMeeting && !isForMeeting)
+                if (seer.IsShieldedFromFirstDeath() && !isForMeeting)
                 {
                     SelfName = $"{ColorString(seer.GetRoleColor(), $"<color=#4fa1ff><u></color>{SeerRealName}</u>")}{SelfDeathReason}<color=#4fa1ff>✚</color>{SelfMark}";
                 }
@@ -2193,7 +2193,7 @@ public static class Utils
                         //TargetName += TargetSuffix.ToString() == "" ? "" : ("\r\n" + TargetSuffix.ToString());
 
                         // Add protected player icon from ShieldPersonDiedFirst
-                        if (target.GetClient().GetHashedPuid() == Main.FirstDiedPrevious && MeetingStates.FirstMeeting && !isForMeeting && Options.ShowShieldedPlayerToAll.GetBool())
+                        if (target.IsShieldedFromFirstDeath() && !isForMeeting && Options.ShowShieldedPlayerToAll.GetBool())
                         {
                             TargetName = $"{TargetRoleText}<color=#4fa1ff><u></color>{TargetPlayerName}</u>{TargetDeathReason}<color=#4fa1ff>✚</color>{TargetMark}{TargetSuffix}";
                         }

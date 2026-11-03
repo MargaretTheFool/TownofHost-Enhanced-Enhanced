@@ -6,6 +6,7 @@ class OnDisconnectedPatch
     public static void Postfix(/*AmongUsClient __instance*/)
     {
         BanManager.ClearSessionBans();
+        CheckMurderPatch.LastKillAttemptTime.Clear();
         Main.VisibleTasksCount = false;
     }
 }

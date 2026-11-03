@@ -50,6 +50,9 @@ internal static class FreeplayInitialization
         Main.TasklessCrewmate.Clear();
         Main.UnreportableBodies.Clear();
         Main.MurderedThisRound.Clear();
+        CheckMurderPatch.LastKillAttemptTime.Clear();
+        Main.FirstDied = "";
+        Main.FirstDiedPrevious = "";
         Main.PlayersDiedInMeeting.Clear();
         Main.AfterMeetingDeathPlayers.Clear();
         Main.CheckShapeshift.Clear();
