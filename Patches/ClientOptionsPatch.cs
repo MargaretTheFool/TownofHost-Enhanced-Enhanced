@@ -6,7 +6,11 @@ namespace TOHE;
 [HarmonyPatch(typeof(OptionsMenuBehaviour), nameof(OptionsMenuBehaviour.Open))]
 public static class CustomSoundOptionsMenuOpenPatch
 {
-    public static void Postfix() => CustomSoundMenu.SetMenuVisible(false);
+    public static void Postfix()
+    {
+        CustomSoundMenu.SetMenuVisible(false);
+        CloudMenu.Close();
+    }
 }
 
 [HarmonyPatch(typeof(OptionsMenuBehaviour), nameof(OptionsMenuBehaviour.Close))]

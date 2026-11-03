@@ -8,6 +8,7 @@ namespace TOHE.Modules;
 
 internal static class CloudMenu
 {
+    private const string OverlayName = "TOHEECloudSettings";
     private static SpriteRenderer panel;
     private static TextMeshPro status;
     private static TextMeshPro roomStatus;
@@ -21,13 +22,19 @@ internal static class CloudMenu
     private static ToggleButtonBehaviour tagsRefresh;
     private static ToggleButtonBehaviour systemProxy;
     private static bool restoreOptions;
+    private static Sprite white;
     private static readonly Dictionary<ToggleButtonBehaviour, bool> buttonStates = new();
     private static CloudService.MenuState? renderedState;
     private static SupportedLangs renderedLanguage;
 
     internal static void Close()
     {
-        if (panel != null) Object.Destroy(panel.gameObject);
+        if (panel != null)
+        {
+            if (ControllerManager.Instance != null && ControllerManager.Instance.IsMenuActiveAtAll(OverlayName))
+                ControllerManager.Instance.CloseOverlayMenu(OverlayName);
+            Object.Destroy(panel.gameObject);
+        }
         panel = null;
         status = null;
         roomStatus = null;
@@ -42,14 +49,52 @@ internal static class CloudMenu
 
     internal static void Open(OptionsMenuBehaviour options)
     {
-        if (panel != null || options == null || options.DisableMouseMovement == null) return;
-        restoreOptions = ClientOptionItem.CustomBackground != null && ClientOptionItem.CustomBackground.gameObject.activeSelf;
+        if (panel != null || options == null) return;
+        Open(options, options.transform, false);
+    }
+
+    internal static void Open(MainMenuManager menu)
+    {
+        if (panel != null || menu == null) return;
+        var options = UnityEngine.Resources.FindObjectsOfTypeAll<OptionsMenuBehaviour>()
+            .FirstOrDefault(x => x.gameObject.scene.name == "MainMenu");
+        Open(options, menu.mainMenuUI.transform, true);
+    }
+
+    private static void Open(OptionsMenuBehaviour options, Transform parent, bool mainMenu)
+    {
+        if (panel != null || options == null || options.DisableMouseMovement == null || options.DisableMouseMovement.Text == null || options.Background == null) return;
+        restoreOptions = !mainMenu && ClientOptionItem.CustomBackground != null && ClientOptionItem.CustomBackground.gameObject.activeSelf;
         if (restoreOptions) ClientOptionItem.CustomBackground.gameObject.SetActive(false);
-        panel = Object.Instantiate(options.Background, options.transform);
+        panel = Object.Instantiate(options.Background, parent);
         panel.name = "TOHEECloudSettings";
         panel.transform.localScale = new Vector3(0.9f, 0.9f, 1f);
-        panel.transform.localPosition += Vector3.back * 15f;
+        panel.transform.localPosition = mainMenu ? new Vector3(0f, 0f, -20f) : panel.transform.localPosition + Vector3.back * 15f;
         panel.gameObject.SetActive(true);
+        if (mainMenu)
+        {
+            panel.gameObject.AddComponent<UnityEngine.Rendering.SortingGroup>().sortingOrder = 100;
+            var blocker = new GameObject("CloudClickBlocker");
+            blocker.SetActive(false);
+            blocker.transform.SetParent(panel.transform, false);
+            blocker.transform.localPosition = new Vector3(0f, 0f, 1f);
+            blocker.AddComponent<BoxCollider2D>().size = new Vector2(30f, 20f);
+            var blockerButton = blocker.AddComponent<PassiveButton>();
+            blockerButton.OnMouseOver = new();
+            blockerButton.OnMouseOut = new();
+            blockerButton.OnClick = new();
+            blocker.SetActive(true);
+
+            var dimmer = new GameObject("CloudDimmer");
+            dimmer.transform.SetParent(panel.transform, false);
+            dimmer.transform.localPosition = new Vector3(0f, 0f, 0.5f);
+            var dimmerRenderer = dimmer.AddComponent<SpriteRenderer>();
+            if (!white) white = Sprite.Create(Texture2D.whiteTexture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+            dimmerRenderer.sprite = white;
+            dimmerRenderer.drawMode = SpriteDrawMode.Sliced;
+            dimmerRenderer.size = new Vector2(30f, 20f);
+            dimmerRenderer.color = new Color(0f, 0f, 0f, 0.58f);
+        }
 
         var warning = Object.Instantiate(options.DisableMouseMovement.Text, panel.transform);
         warning.DestroyTranslator();
@@ -106,10 +151,13 @@ internal static class CloudMenu
         tags = Button("CloudTagsUse", 1.3f, -0.78f, () => CloudService.SetTagsEnabled(!CloudService.TagsEnabled));
         tagsRefresh = Button("CloudTagsRefresh", -1.3f, -1.36f, CloudService.RefreshTags);
         systemProxy = Button("CloudProxyUse", 1.3f, -1.36f, () => CloudService.SetUseSystemProxy(!CloudService.UseSystemProxy));
-        Button("Back", 0f, -2.30f, Close);
+        var back = Button("Back", 0f, -2.30f, Close);
 
         CloudService.RefreshAccount();
         Refresh();
+        foreach (var item in panel.GetComponentsInChildren<Transform>(true))
+            item.gameObject.layer = options.DisableMouseMovement.Text.gameObject.layer;
+        ControllerManager.Instance?.OpenOverlayMenu(OverlayName, back.GetComponent<PassiveButton>());
 
         void Run(string command) => CloudService.TryHandleCommand(command);
 
@@ -137,6 +185,11 @@ internal static class CloudMenu
             passive.OnClick.AddListener((UnityEngine.Events.UnityAction)(() => { action(); Refresh(); }));
             return button;
         }
+    }
+
+    internal static void Update()
+    {
+        if (panel != null && Input.GetKeyDown(KeyCode.Escape)) Close();
     }
 
     internal static void Refresh()

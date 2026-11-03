@@ -290,7 +290,8 @@ internal static class CloudRooms
                 }
                 if (deleting && response.Status is HttpStatusCode.NoContent or HttpStatusCode.OK or HttpStatusCode.NotFound)
                 {
-                    if (confirmedOrigin == origin && confirmedIdentity == identity && confirmedRoomId == roomId)
+                    bool wasConfirmed = confirmedOrigin == origin && confirmedIdentity == identity && confirmedRoomId == roomId;
+                    if (wasConfirmed)
                     {
                         confirmedKey = confirmedRoomId = confirmedIdentity = null;
                         confirmedOrigin = null;
@@ -299,6 +300,7 @@ internal static class CloudRooms
                     activeOrigin = null;
                     retryAt = rateLimitedUntil = 0;
                     lastNotice = null;
+                    if (wasConfirmed) Messages.Enqueue("CloudRoomUnshared");
                     continue;
                 }
                 if (ack != null)
@@ -312,6 +314,9 @@ internal static class CloudRooms
                     heartbeatAt = Environment.TickCount64 + ack.HeartbeatAfterSeconds * 1000L;
                     retryAt = rateLimitedUntil = 0;
                     lastNotice = null;
+                    if (method == HttpMethod.Post && desiredSnapshot != null && desiredOrigin == origin
+                        && desiredIdentity == identity && desiredKey == key && desiredEpoch == epoch)
+                        Messages.Enqueue("CloudRoomShared");
                     if (desiredVersion != version) continue;
                     running = false;
                     return;

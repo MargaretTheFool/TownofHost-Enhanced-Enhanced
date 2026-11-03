@@ -1,5 +1,6 @@
 using System;
 using TMPro;
+using TOHE.Modules;
 using UnityEngine;
 using UnityEngine.UI;
 using static TOHE.Translator;
@@ -50,6 +51,8 @@ public static class MainMenuManagerPatch
     private static PassiveButton gitHubButton;
     private static PassiveButton websiteButton;
     private static PassiveButton discordButton;
+    private static PassiveButton cloudButton;
+    private static TMP_Text cloudButtonText;
     //private static PassiveButton patreonButton;
 
     [HarmonyPatch(nameof(MainMenuManager.Start)), HarmonyPostfix, HarmonyPriority(Priority.Normal)]
@@ -214,6 +217,27 @@ public static class MainMenuManagerPatch
         }
         websiteButton.gameObject.SetActive(Main.ShowWebsiteButton);
 
+        if (cloudButton == null)
+        {
+            cloudButton = CreateButton(
+                "CloudButton",
+                Vector3.zero,
+                new(55, 112, 153, byte.MaxValue),
+                new(100, 167, 209, byte.MaxValue),
+                (UnityEngine.Events.UnityAction)(() => CloudMenu.Open(__instance)),
+                CloudService.MainMenuAccountLabel);
+            cloudButton.transform.localScale = Vector3.one * 0.6f;
+            var cloudAnchor = cloudButton.gameObject.AddComponent<AspectPosition>();
+            cloudAnchor.parentCam = Camera.main;
+            cloudAnchor.Alignment = AspectPosition.EdgeAlignments.RightBottom;
+            cloudAnchor.DistanceFromEdge = new Vector3(4.8f, 0.58f, -7f);
+            cloudButtonText = cloudButton.transform.Find("FontPlacer/Text_TMP").GetComponent<TMP_Text>();
+            cloudButtonText.enableAutoSizing = true;
+            cloudButtonText.fontSizeMin = 1.5f;
+            cloudButtonText.fontSizeMax = 3.5f;
+        }
+        cloudButton.gameObject.SetActive(true);
+
         var howToPlayButton = __instance.howToPlayButton;
         var freeplayButton = howToPlayButton.transform.parent.Find("FreePlayButton");
 
@@ -229,6 +253,12 @@ public static class MainMenuManagerPatch
     public static void LateUpdate_Postfix(MainMenuManager __instance)
     {
         CustomSoundMenu.Update();
+        CloudMenu.Update();
+        if (cloudButtonText != null)
+        {
+            string label = CloudService.MainMenuAccountLabel;
+            if (cloudButtonText.text != label) cloudButtonText.text = label;
+        }
         if (MainMenuManagerStartPatch.ToheLogo == null || !MainMenuManagerStartPatch.ToheLogo.gameObject.activeInHierarchy
             || gitHubButton == null || discordButton == null || websiteButton == null) return;
 
@@ -333,6 +363,7 @@ public static class MainMenuManagerPatch
     public static void OpenMenu_Postfix()
     {
         CustomSoundMenu.SetMenuVisible(false);
+        CloudMenu.Close();
         if (MainMenuManagerStartPatch.ToheLogo != null) MainMenuManagerStartPatch.ToheLogo.gameObject.SetActive(false);
     }
     [HarmonyPatch(nameof(MainMenuManager.ResetScreen)), HarmonyPostfix]
@@ -343,5 +374,9 @@ public static class MainMenuManagerPatch
     }
 
     [HarmonyPatch("DeactivateMainMenuUI"), HarmonyPostfix]
-    public static void DeactivateMainMenuUI_Postfix() => CustomSoundMenu.SetMenuVisible(false);
+    public static void DeactivateMainMenuUI_Postfix()
+    {
+        CustomSoundMenu.SetMenuVisible(false);
+        CloudMenu.Close();
+    }
 }

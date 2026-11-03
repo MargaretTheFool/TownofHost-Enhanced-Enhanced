@@ -76,6 +76,24 @@ internal static class CloudService
     internal static bool CanManage => !IsBusy;
     internal static string LastMessage { get; private set; } = string.Empty;
 
+    internal static string MainMenuAccountLabel
+    {
+        get
+        {
+            var account = CloudAccount.Current;
+            string key;
+            if (!CloudUserAgent.TryGet(out _) || accountToken == null || accountPuid == null)
+                key = "CloudMainMenuUnavailable";
+            else if (CloudAccount.IsLoading)
+                key = "CloudMainMenuLoading";
+            else if (account == null)
+                key = "CloudMainMenuError";
+            else
+                key = account.Bound ? "CloudMainMenuBound" : "CloudMainMenuUnbound";
+            return Translator.GetString(key);
+        }
+    }
+
     internal static MenuState CaptureMenuState()
     {
         bool userAgentReady = CloudUserAgent.TryGet(out string userAgent);
