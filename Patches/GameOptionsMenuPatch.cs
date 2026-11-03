@@ -656,12 +656,16 @@ public static class NumberOptionPatch
                 __instance.Value = (float)Math.Round(__instance.Value, 2);
                 break;
             case StringNames.GameNumImpostors:
-                __instance.ValidRange = new(ServerLimits.MinImpostors, ServerLimits.MaxImpostors);
+                __instance.ValidRange.min = ServerLimits.MinImpostors;
+                __instance.ValidRange.max = ServerLimits.MaxImpostors;
                 break;
         }
 
         if (__instance.intOptionName == AmongUs.GameOptions.Int32OptionNames.MaxPlayers)
-            __instance.ValidRange = new(ServerLimits.MinPlayers, ServerLimits.MaxPlayers);
+        {
+            __instance.ValidRange.min = ServerLimits.MinPlayers;
+            __instance.ValidRange.max = ServerLimits.MaxPlayers;
+        }
 
         if (ModGameOptionsMenu.OptionList.TryGetValue(__instance, out var index))
         {
