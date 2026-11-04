@@ -218,6 +218,7 @@ public static class Options
     public static OptionItem SuffixMode;
     public static OptionItem HideHostText;
     public static OptionItem HideAllTagsAndText;
+    public static OptionItem InlineTagsForVanilla;
     public static OptionItem HideGameSettings;
 
     public static OptionItem PlayerCanSetColor;
@@ -1124,6 +1125,7 @@ public static class Options
             .SetHeader(true);
         HideHostText = BooleanOptionItem.Create(60311, "HideHostText", false, TabGroup.SystemSettings, false);
         HideAllTagsAndText = BooleanOptionItem.Create(60312, "HideAllTagsAndText", false, TabGroup.SystemSettings, false);
+        InlineTagsForVanilla = BooleanOptionItem.Create(60313, "InlineTagsForVanilla", false, TabGroup.SystemSettings, false);
         HideGameSettings = BooleanOptionItem.Create(60310, "HideGameSettings", false, TabGroup.SystemSettings, false);
         //DIYGameSettings = BooleanOptionItem.Create(60320, "DIYGameSettings", false, TabGroup.SystemSettings, false);
         PlayerCanSetColor = BooleanOptionItem.Create(60330, "PlayerCanSetColor", false, TabGroup.SystemSettings, false);

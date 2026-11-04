@@ -9,9 +9,9 @@ namespace TOHE.Modules;
 internal static class PlayerTagFiles
 {
 #if ANDROID
-    private static string TagsDirectory => Path.Combine(UnityEngine.Application.persistentDataPath, "TOHE-DATA", "Tags");
+    private static string TagsDirectory => Path.Combine(UnityEngine.Application.persistentDataPath, "TOHEE-DATA", "Tags");
 #else
-    private static string TagsDirectory => Path.Combine("TOHE-DATA", "Tags");
+    private static string TagsDirectory => Path.Combine("TOHEE-DATA", "Tags");
 #endif
     private static Dictionary<string, Entry> entries = new(StringComparer.Ordinal);
 

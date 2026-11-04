@@ -11,9 +11,9 @@ namespace TOHE;
 
 public static class BanManager
 {
-    private const string DenyNameListPath = "./TOHE-DATA/DenyName.txt";
-    private const string BanListPath = "./TOHE-DATA/BanList.txt";
-    private const string WhiteListListPath = "./TOHE-DATA/WhiteList.txt";
+    private const string DenyNameListPath = "./TOHEE-DATA/DenyName.txt";
+    private const string BanListPath = "./TOHEE-DATA/BanList.txt";
+    private const string WhiteListListPath = "./TOHEE-DATA/WhiteList.txt";
     // Full PUIDs stay banned for this room even if the client reconnects from another IP.
     private static readonly HashSet<string> SessionBannedPuids = new(StringComparer.Ordinal);
     private static readonly object SessionBanLock = new();
@@ -43,7 +43,7 @@ public static class BanManager
     {
         try
         {
-            Directory.CreateDirectory("TOHE-DATA");
+            Directory.CreateDirectory("TOHEE-DATA");
 
             if (!File.Exists(BanListPath))
             {
@@ -121,7 +121,7 @@ public static class BanManager
 
         try
         {
-            Directory.CreateDirectory("TOHE-DATA");
+            Directory.CreateDirectory("TOHEE-DATA");
             if (!File.Exists(DenyNameListPath)) File.Create(DenyNameListPath).Close();
             using StreamReader sr = new(DenyNameListPath);
             string line;
@@ -204,7 +204,7 @@ public static class BanManager
 
         try
         {
-            Directory.CreateDirectory("TOHE-DATA");
+            Directory.CreateDirectory("TOHEE-DATA");
             if (!File.Exists(BanListPath)) File.Create(BanListPath).Close();
             using StreamReader sr = new(BanListPath);
             string line;

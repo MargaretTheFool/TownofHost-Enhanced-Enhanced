@@ -2,13 +2,13 @@
 
 # 房主本地玩家标签
 
-房主使用 `TOHE-DATA/Tags/<好友码>.txt` 为玩家设置本地标签、权限和 GM 身份。标签显示在玩家名字前面，其他玩家通过房主发送的名字更新看到它。`TOHE-DATA/tags.txt` 仅是低优先级的外观标签后备，不会设置权限或 GM 身份。文件都只保存在房主设备上。
+房主使用 `TOHEE-DATA/Tags/<好友码>.txt` 为玩家设置本地标签、权限和 GM 身份。标签显示在玩家名字前面，其他玩家通过房主发送的名字更新看到它。`TOHEE-DATA/tags.txt` 仅是低优先级的外观标签后备，不会设置权限或 GM 身份。文件都只保存在房主设备上。
 
-这是有意变更的行为：`TOHE-DATA/Moderators.txt` 和 `TOHE-DATA/VIP-List.txt` 不再读取，也不再授予或显示 MOD/VIP 身份；相关名单选项已从界面移除，`/modcolor`、`/vipcolor` 命令也已移除。旧的 MOD/VIP 纯颜色文件不会授予身份或权限。`MOD_TAGS`、`VIP_TAGS` 现在只是普通文件夹名称，可用于存放结构化玩家配置。不会自动迁移旧配置，也不会自动删除这些旧文件；如需保留相关玩家的本地权限或 GM 设置，请手动将设置写入对应的 `<好友码>.txt`。模组内置的开发者标签（包括 DevUser）仍会显示，`Tags/SPONSOR_TAGS/<好友码>.txt` 的纯六位颜色格式仍可覆盖 DevUser 内置标签颜色。
+这是有意变更的行为：`TOHEE-DATA/Moderators.txt` 和 `TOHEE-DATA/VIP-List.txt` 不再读取，也不再授予或显示 MOD/VIP 身份；相关名单选项已从界面移除，`/modcolor`、`/vipcolor` 命令也已移除。旧的 MOD/VIP 纯颜色文件不会授予身份或权限。`MOD_TAGS`、`VIP_TAGS` 现在只是普通文件夹名称，可用于存放结构化玩家配置。不会自动迁移旧配置，也不会自动删除这些旧文件；如需保留相关玩家的本地权限或 GM 设置，请手动将设置写入对应的 `<好友码>.txt`。模组内置的开发者标签（包括 DevUser）仍会显示，`Tags/SPONSOR_TAGS/<好友码>.txt` 的纯六位颜色格式仍可覆盖 DevUser 内置标签颜色。
 
 ## TOHE 单玩家 TXT：标签和权限
 
-模组启动时会在 `TOHE-DATA/Tags` 根目录建立三个模板；如果模板已存在，不会覆盖。桌面版路径相对于游戏工作目录；Android 版的单玩家文件位于应用的持久数据目录。这些模板只是供复制的示例文件，本身不会匹配玩家或授予任何权限：
+模组启动时会在 `TOHEE-DATA/Tags` 根目录建立三个模板；如果模板已存在，不会覆盖。桌面版路径相对于游戏工作目录；Android 版的单玩家文件位于应用的持久数据目录。这些模板只是供复制的示例文件，本身不会匹配玩家或授予任何权限：
 
 | 模板 | 初始字段 |
 | --- | --- |
@@ -16,7 +16,7 @@
 | `Moderator_Template.txt` | `TagName: Moderator`、`TagColor: 8BBEE0`、`PermissionLevel: 5`，所有布尔字段为 `false` |
 | `VIP_Template.txt` | `TagName: VIP`、`TagColor: FFFF00`、`PermissionLevel: 1`，所有布尔字段为 `false` |
 
-复制所需模板，将副本改名为玩家的完整好友码加 `.txt`，再放到 `Tags` 根目录或直接子目录（一层）中。例如可复制 `Moderator_Template.txt` 到 `TOHE-DATA/Tags/moderators/sampleuser#1234.txt`，或复制 `VIP_Template.txt` 到 `TOHE-DATA/Tags/vips/sampleuser#1234.txt`，然后按需编辑字段。等级是累加的，因此 Moderator 模板的等级 5 也包含 `/start` 等较低等级权限；若不需要这些权限，请降低 `PermissionLevel`。模板文件自身不授予权限，只有按好友码命名的玩家配置文件会生效。
+复制所需模板，将副本改名为玩家的完整好友码加 `.txt`，再放到 `Tags` 根目录或直接子目录（一层）中。例如可复制 `Moderator_Template.txt` 到 `TOHEE-DATA/Tags/moderators/sampleuser#1234.txt`，或复制 `VIP_Template.txt` 到 `TOHEE-DATA/Tags/vips/sampleuser#1234.txt`，然后按需编辑字段。等级是累加的，因此 Moderator 模板的等级 5 也包含 `/start` 等较低等级权限；若不需要这些权限，请降低 `PermissionLevel`。模板文件自身不授予权限，只有按好友码命名的玩家配置文件会生效。
 
 ```text
 TagName:
@@ -57,9 +57,9 @@ AssignGameMaster: false
 
 | 颜色文件 | 生效条件 | 默认颜色 |
 | --- | --- | --- |
-| `TOHE-DATA/Tags/SPONSOR_TAGS/<DevUser好友码>.txt`（内容只有六位颜色） | DevUser 具有内置彩色标签，且使用模组客户端 | DevUser 内置标签的颜色 |
+| `TOHEE-DATA/Tags/SPONSOR_TAGS/<DevUser好友码>.txt`（内容只有六位颜色） | DevUser 具有内置彩色标签，且使用模组客户端 | DevUser 内置标签的颜色 |
 
-例如，创建 `TOHE-DATA/Tags/SPONSOR_TAGS/<DevUser好友码>.txt`，文件内容只写：
+例如，创建 `TOHEE-DATA/Tags/SPONSOR_TAGS/<DevUser好友码>.txt`，文件内容只写：
 
 ```text
 33CCFF
@@ -84,7 +84,7 @@ AssignGameMaster: false
 
 ## 手动编辑后备标签文件
 
-首次成功添加标签后，游戏工作目录中会出现 `TOHE-DATA/tags.txt`。这是房主设备上的文件，不会上传给其他房主。每行按“好友码=带颜色的标签”保存，例如：
+首次成功添加标签后，游戏工作目录中会出现 `TOHEE-DATA/tags.txt`。这是房主设备上的文件，不会上传给其他房主。每行按“好友码=带颜色的标签”保存，例如：
 
 ```text
 sampleuser#1234=<color=#33CCFFFF>测试标签 </color>
@@ -93,7 +93,7 @@ otheruser#5678=<color=#FF00AAFF>活动主持人 </color>
 
 等号只在好友码后面的第一个位置充当分隔符，因此颜色标记和标签文字中的 `=` 可以正常读取。手工编辑后，房主输入 `/tags reload` 即可重载文件；在大厅执行时还会立即刷新显示，重新开房也会重新加载。删除文件中的某行并重载，会移除该玩家的后备标签；单玩家 TXT 中的标签不受影响。文件不存在时不会自动给任何人加后备标签。
 
-房主也可以在 Client Options 中开启“自动重载标签”。启用后每 5 秒检查 `TOHE-DATA/Tags` 根目录及直接子目录中的 `.txt` 文件，以及后备文件 `TOHE-DATA/tags.txt`；发现文件增删、重命名、大小或修改时间变化时，自动重载标签，并在大厅刷新玩家名字。`/tags reload` 仍可随时手动使用。该选项默认关闭。
+房主也可以在 Client Options 中开启“自动重载标签”。启用后每 5 秒检查 `TOHEE-DATA/Tags` 根目录及直接子目录中的 `.txt` 文件，以及后备文件 `TOHEE-DATA/tags.txt`；发现文件增删、重命名、大小或修改时间变化时，自动重载标签，并在大厅刷新玩家名字。`/tags reload` 仍可随时手动使用。该选项默认关闭。
 
 `LocalPlayerTags.json` 已停用，里面的数据不会迁移。旧的 Moderator/VIP 名单及颜色目录也不会自动迁移，旧文件不会被自动删除。本地文件中的权限和 GM 身份只从单玩家 TXT 读取；`tags.txt` 仍是外观后备，不会授予权限。
 

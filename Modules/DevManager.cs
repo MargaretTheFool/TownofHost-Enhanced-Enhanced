@@ -2,7 +2,7 @@
 
 namespace TOHE;
 
-public class DevUser(string code = "", string color = "null", string userType = "null", string tag = "null", bool isUp = false, bool isDev = false, bool deBug = false, bool colorCmd = false, bool nameCmd = false, string upName = "未认证用户")
+public class DevUser(string code = "", string color = "null", string userType = "null", string tag = "null", bool isUp = true, bool isDev = false, bool deBug = false, bool colorCmd = false, bool nameCmd = false, string upName = "UnKnown")
 {
     public string Code { get; set; } = code;
     public string Color { get; set; } = color;
@@ -20,7 +20,7 @@ public class DevUser(string code = "", string color = "null", string userType = 
     public string GetTag() => GetTag(true);
     public string GetTag(bool useLocalColor)
     {
-        string tagColorFilePath = @$"./TOHE-DATA/Tags/SPONSOR_TAGS/{Code}.txt";
+        string tagColorFilePath = @$"./TOHEE-DATA/Tags/SPONSOR_TAGS/{Code}.txt";
 
         if (Color == "null" || Color == string.Empty) return $"<size=1.2>{Tag}</size>\r\n";
         var startColor = Color.TrimStart('#');

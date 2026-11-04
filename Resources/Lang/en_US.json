@@ -51,6 +51,7 @@
 
   "HideHostText": "Hide 'Host♥' Text",
   "HideAllTagsAndText": "Hide All Tags (for «AutoMuteUs»)",
+  "InlineTagsForVanilla": "Show cloud tags inline for vanilla",
 
   "SupportUs": "Support Us",
   "update": "Update",
@@ -2248,7 +2249,7 @@
   "FeatureCommandNoAccess": "You do not have permission to use this command.",
   "FeatureInvalidTarget": "Invalid or protected target.",
   "FeatureCommandCompleted": "Command completed.",
-  "LocalTagsUsage": "Edit TOHE-DATA/Tags/<friendcode>.txt or TOHE-DATA/tags.txt, then use /tags reload.",
+  "LocalTagsUsage": "Edit TOHEE-DATA/Tags/<friendcode>.txt or TOHEE-DATA/tags.txt, then use /tags reload.",
   "LocalTagsReloaded": "Local tags reloaded.",
   "LocalTagsFailed": "Some local tag data could not be reloaded.",
   "PrivateTagAddUsage": "/addtag <player id> <RRGGBB> <tag text>",

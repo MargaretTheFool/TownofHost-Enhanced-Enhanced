@@ -10,7 +10,7 @@ public static class PresetSharing
     public const int FormatVersion = 1;
     public const int MaximumFileBytes = 2 * 1024 * 1024;
     private const string CompatibleGameVersion = Main.SupportedVersionAU;
-    private static readonly string PresetDirectory = Path.GetFullPath("./TOHE-DATA/Presets");
+    private static readonly string PresetDirectory = Path.GetFullPath("./TOHEE-DATA/Presets");
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public enum Error

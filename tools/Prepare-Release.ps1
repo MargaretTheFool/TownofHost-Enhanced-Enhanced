@@ -138,7 +138,7 @@ try {
             foreach ($required in @('.doorstop_version', 'doorstop_config.ini', 'winhttp.dll', 'dotnet/coreclr.dll', 'BepInEx/plugins/TOHE.dll', 'BepInEx/plugins/Mini.RegionInstall.dll', 'BepInEx/plugins/RemoveGcMaxTimeSlice.Plugin.dll', 'BepInEx/patchers/Il2CppInteropGcFix.dll', 'BepInEx/config/BepInEx.cfg', 'LICENSE.RemoveGcMaxTimeSlice.txt', 'LICENSE.Il2CppInteropGcFix.txt')) {
                 if ($names -notcontains $required) { throw "Missing release file: $required" }
             }
-            if ($names -match '(^|/)(interop|TOHE-DATA|Among Us_Data|requests|responses|captures)/|\.log$|RuntimeProbe|GameAssembly\.dll|Assembly-CSharp\.dll|Among Us\.exe') {
+            if ($names -match '(^|/)(interop|TOHEE-DATA|TOHE-DATA|Among Us_Data|requests|responses|captures)/|\.log$|RuntimeProbe|GameAssembly\.dll|Assembly-CSharp\.dll|Among Us\.exe') {
                 throw 'Generated interop, game, private data or probe files found in release archive.'
             }
         } finally { $archive.Dispose() }

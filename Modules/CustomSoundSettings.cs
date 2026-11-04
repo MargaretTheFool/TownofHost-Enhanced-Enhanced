@@ -9,7 +9,7 @@ namespace TOHE.Modules;
 internal sealed class CustomSoundSettings
 {
     private const int CurrentVersion = 1;
-    private static readonly string ConfigPath = Path.Combine(Environment.CurrentDirectory, "TOHE-DATA", "CustomSoundsVolumeConfig.json");
+    private static readonly string ConfigPath = Path.Combine(Environment.CurrentDirectory, "TOHEE-DATA", "CustomSoundsVolumeConfig.json");
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public int MasterVolume { get; set; } = 100;

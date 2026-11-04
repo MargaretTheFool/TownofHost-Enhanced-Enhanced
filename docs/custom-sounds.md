@@ -39,7 +39,7 @@ CustomSoundsManager.RPCPlayCustomSoundAll("Boom");    // Host broadcasts and pla
 
 ## Local volume settings
 
-`TOHE-DATA/CustomSoundsVolumeConfig.json` stores per-client settings:
+`TOHEE-DATA/CustomSoundsVolumeConfig.json` stores per-client settings:
 
 ```json
 {

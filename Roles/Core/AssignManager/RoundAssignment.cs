@@ -46,7 +46,7 @@ public static class RoundAssignment
         // Local replay evidence contains IDs/options/results only, never account identifiers.
         try
         {
-            string directory = Path.Combine("TOHE-DATA", "Assignments");
+            string directory = Path.Combine("TOHEE-DATA", "Assignments");
             Directory.CreateDirectory(directory);
             var record = new
             {

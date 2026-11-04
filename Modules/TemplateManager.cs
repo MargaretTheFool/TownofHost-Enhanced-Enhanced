@@ -11,7 +11,7 @@ namespace TOHE;
 
 public static class TemplateManager
 {
-    private static readonly string TEMPLATE_FILE_PATH = "./TOHE-DATA/template.txt";
+    private static readonly string TEMPLATE_FILE_PATH = "./TOHEE-DATA/template.txt";
     private static readonly Dictionary<string, Func<string>> _replaceDictionaryNormalOptions = new()
     {
         ["RoomCode"] = () => InnerNet.GameCode.IntToGameName(AmongUsClient.Instance.GameId),
@@ -106,9 +106,9 @@ public static class TemplateManager
                     _ => "English"
                 };
             else fileName = "English";
-            if (!Directory.Exists(@"TOHE-DATA")) Directory.CreateDirectory(@"TOHE-DATA");
+            if (!Directory.Exists(@"TOHEE-DATA")) Directory.CreateDirectory(@"TOHEE-DATA");
             var defaultTemplateMsg = GetResourcesTxt($"TOHE.Resources.Config.template.{fileName}.txt");
-            const string defaultTemplatePath = @"./TOHE-DATA/Default_Teamplate.txt";
+            const string defaultTemplatePath = @"./TOHEE-DATA/Default_Teamplate.txt";
             var defaultTemplateExists = File.Exists(defaultTemplatePath);
             if (!defaultTemplateExists)
                 Logger.Warn("Creating Default_Template.txt", "TemplateManager");

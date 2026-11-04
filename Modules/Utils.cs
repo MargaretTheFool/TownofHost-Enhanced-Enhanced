@@ -1694,7 +1694,12 @@ public static class Utils
             };
         }
 
-        if (!name.Contains($"\r\r") && devUser.HasTag() && (player.IsModded() || hasCloudTag))
+        if (!player.IsModded() && Options.InlineTagsForVanilla.GetBool())
+        {
+            string tag = hasFileTag ? fileTag : hasPrivateTag ? privateTag : devUser.HasTag() ? devUser.GetTag(!hasHostCloudUser || !colorOverridden).TrimEnd('\r', '\n') : string.Empty;
+            name = tag + name;
+        }
+        else if (!name.Contains($"\r\r") && devUser.HasTag() && (player.IsModded() || hasCloudTag))
         {
             name = devUser.GetTag(!hasHostCloudUser || !colorOverridden) + "<size=1.5>" + modtag + "</size>" + selectedPrivateTag + name;
         }

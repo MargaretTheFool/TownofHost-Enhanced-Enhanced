@@ -7,7 +7,7 @@ namespace TOHE.Modules;
 // https://github.com/tukasa0001/TownOfHost/blob/main/Modules/OptionSaver.cs
 public static class OptionSaver
 {
-    private static readonly DirectoryInfo SaveDataDirectoryInfo = new("./TOHE-DATA/SaveData/");
+    private static readonly DirectoryInfo SaveDataDirectoryInfo = new("./TOHEE-DATA/SaveData/");
     private static readonly string LegacyPath = Path.Combine(SaveDataDirectoryInfo.FullName, "Options.json");
     private static readonly string GlobalPath = Path.Combine(SaveDataDirectoryInfo.FullName, "GlobalOptions.jsonc");
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -27,11 +27,7 @@ public static class OptionSaver
 
     public static void Initialize()
     {
-        if (!SaveDataDirectoryInfo.Exists)
-        {
-            SaveDataDirectoryInfo.Create();
-            SaveDataDirectoryInfo.Attributes |= FileAttributes.Hidden;
-        }
+        if (!SaveDataDirectoryInfo.Exists) SaveDataDirectoryInfo.Create();
     }
 
     /// <summary>Save current options to the files whose values have changed.</summary>

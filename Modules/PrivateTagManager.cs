@@ -8,9 +8,9 @@ namespace TOHE.Modules;
 internal static class PrivateTagManager
 {
 #if ANDROID
-    private static string TagFile => Path.Combine(UnityEngine.Application.persistentDataPath, "TOHE-DATA", "tags.txt");
+    private static string TagFile => Path.Combine(UnityEngine.Application.persistentDataPath, "TOHEE-DATA", "tags.txt");
 #else
-    private static string TagFile => Path.Combine("TOHE-DATA", "tags.txt");
+    private static string TagFile => Path.Combine("TOHEE-DATA", "tags.txt");
 #endif
     private static Dictionary<string, string> tags = new(StringComparer.Ordinal);
 

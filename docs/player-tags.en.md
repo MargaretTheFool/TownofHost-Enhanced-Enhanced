@@ -2,13 +2,13 @@
 
 # Host-local player tags
 
-Hosts use `TOHE-DATA/Tags/<friend code>.txt` to configure local player tags, permissions, and GM status. Tags appear before player names, and other players see them through name updates sent by the host. `TOHE-DATA/tags.txt` is only a lower-priority cosmetic tag fallback; it does not set permissions or GM status. These files are stored only on the host's device.
+Hosts use `TOHEE-DATA/Tags/<friend code>.txt` to configure local player tags, permissions, and GM status. Tags appear before player names, and other players see them through name updates sent by the host. `TOHEE-DATA/tags.txt` is only a lower-priority cosmetic tag fallback; it does not set permissions or GM status. These files are stored only on the host's device.
 
-This is a deliberate behavior change: `TOHE-DATA/Moderators.txt` and `TOHE-DATA/VIP-List.txt` are no longer read and no longer grant or display MOD/VIP identities. The associated list options no longer appear in the interface, and the `/modcolor` and `/vipcolor` commands have been removed. Old MOD/VIP raw-color files do not grant identities or permissions. `MOD_TAGS` and `VIP_TAGS` are now ordinary folder names that can hold structured player configurations. Old configuration is not migrated automatically, and existing files are not deleted automatically. To retain local permissions or GM settings for a player, enter them manually in that player's `<friend code>.txt`. Built-in developer tags, including DevUser, still display, and the six-digit raw-color format in `Tags/SPONSOR_TAGS/<friend code>.txt` still overrides DevUser's built-in tag color.
+This is a deliberate behavior change: `TOHEE-DATA/Moderators.txt` and `TOHEE-DATA/VIP-List.txt` are no longer read and no longer grant or display MOD/VIP identities. The associated list options no longer appear in the interface, and the `/modcolor` and `/vipcolor` commands have been removed. Old MOD/VIP raw-color files do not grant identities or permissions. `MOD_TAGS` and `VIP_TAGS` are now ordinary folder names that can hold structured player configurations. Old configuration is not migrated automatically, and existing files are not deleted automatically. To retain local permissions or GM settings for a player, enter them manually in that player's `<friend code>.txt`. Built-in developer tags, including DevUser, still display, and the six-digit raw-color format in `Tags/SPONSOR_TAGS/<friend code>.txt` still overrides DevUser's built-in tag color.
 
 ## TOHE per-player TXT: tags and permissions
 
-When the mod starts, it creates three templates in the `TOHE-DATA/Tags` root directory. Existing templates are not overwritten. On desktop, the path is relative to the game's working directory; on Android, per-player files are under the app's persistent data directory. These are examples to copy; the template files themselves do not match players or grant permissions:
+When the mod starts, it creates three templates in the `TOHEE-DATA/Tags` root directory. Existing templates are not overwritten. On desktop, the path is relative to the game's working directory; on Android, per-player files are under the app's persistent data directory. These are examples to copy; the template files themselves do not match players or grant permissions:
 
 | Template | Initial fields |
 | --- | --- |
@@ -16,7 +16,7 @@ When the mod starts, it creates three templates in the `TOHE-DATA/Tags` root dir
 | `Moderator_Template.txt` | `TagName: Moderator`, `TagColor: 8BBEE0`, `PermissionLevel: 5`, and all boolean fields are `false` |
 | `VIP_Template.txt` | `TagName: VIP`, `TagColor: FFFF00`, `PermissionLevel: 1`, and all boolean fields are `false` |
 
-Copy the template you want, rename the copy to the player's full friend code plus `.txt`, and place it in the `Tags` root or an immediate subdirectory (one level only). For example, copy `Moderator_Template.txt` to `TOHE-DATA/Tags/moderators/sampleuser#1234.txt`, or copy `VIP_Template.txt` to `TOHE-DATA/Tags/vips/sampleuser#1234.txt`, then edit the fields as needed. Levels are cumulative, so the Moderator template's level 5 includes lower-level permissions such as `/start`; lower `PermissionLevel` if those permissions are not needed. A template file itself grants no permissions; only a player configuration file named for a friend code takes effect.
+Copy the template you want, rename the copy to the player's full friend code plus `.txt`, and place it in the `Tags` root or an immediate subdirectory (one level only). For example, copy `Moderator_Template.txt` to `TOHEE-DATA/Tags/moderators/sampleuser#1234.txt`, or copy `VIP_Template.txt` to `TOHEE-DATA/Tags/vips/sampleuser#1234.txt`, then edit the fields as needed. Levels are cumulative, so the Moderator template's level 5 includes lower-level permissions such as `/start`; lower `PermissionLevel` if those permissions are not needed. A template file itself grants no permissions; only a player configuration file named for a friend code takes effect.
 
 ```text
 TagName:
@@ -57,9 +57,9 @@ Raw-color files in `SPONSOR_TAGS` override DevUser's built-in tag color; this le
 
 | Color file | Conditions | Default color |
 | --- | --- | --- |
-| `TOHE-DATA/Tags/SPONSOR_TAGS/<DevUser friend code>.txt` (contents are only a six-digit color) | DevUser has a built-in colored tag and is using the mod client | DevUser's built-in tag color |
+| `TOHEE-DATA/Tags/SPONSOR_TAGS/<DevUser friend code>.txt` (contents are only a six-digit color) | DevUser has a built-in colored tag and is using the mod client | DevUser's built-in tag color |
 
-For example, create `TOHE-DATA/Tags/SPONSOR_TAGS/<DevUser friend code>.txt` containing only:
+For example, create `TOHEE-DATA/Tags/SPONSOR_TAGS/<DevUser friend code>.txt` containing only:
 
 ```text
 33CCFF
@@ -84,7 +84,7 @@ Write the color as six-digit RGB hexadecimal without `#`, for example `FF00AA`. 
 
 ## Edit the fallback tag file manually
 
-After the first successful tag addition, `TOHE-DATA/tags.txt` appears in the game's working directory. This file is on the host's device and is not uploaded to other hosts. Each line is stored as “friend code=colored tag”, for example:
+After the first successful tag addition, `TOHEE-DATA/tags.txt` appears in the game's working directory. This file is on the host's device and is not uploaded to other hosts. Each line is stored as “friend code=colored tag”, for example:
 
 ```text
 sampleuser#1234=<color=#33CCFFFF>Sample tag </color>
@@ -93,7 +93,7 @@ otheruser#5678=<color=#FF00AAFF>Event host </color>
 
 Only the first `=` after the friend code acts as the separator, so `=` characters in color markup and tag text are read correctly. After manual edits, the host can enter `/tags reload` to reload the file; when run in the lobby, it also refreshes the display immediately. The file is reloaded when hosting a room again as well. Deleting a line from the file and reloading removes that player's fallback tag; a tag in a per-player TXT file is unaffected. If the file does not exist, no one receives a fallback tag automatically.
 
-Hosts can also enable **Auto Reload Tags** in Client Options. Every 5 seconds, it checks `.txt` files in the `TOHE-DATA/Tags` root and its immediate subdirectories, plus the fallback `TOHE-DATA/tags.txt`. When a file is added, removed, renamed, or changes size or modification time, it reloads the tags and refreshes player names in the lobby. `/tags reload` remains available for manual reloads. The option is off by default.
+Hosts can also enable **Auto Reload Tags** in Client Options. Every 5 seconds, it checks `.txt` files in the `TOHEE-DATA/Tags` root and its immediate subdirectories, plus the fallback `TOHEE-DATA/tags.txt`. When a file is added, removed, renamed, or changes size or modification time, it reloads the tags and refreshes player names in the lobby. `/tags reload` remains available for manual reloads. The option is off by default.
 
 `LocalPlayerTags.json` is no longer used, and its data is not migrated. Old Moderator/VIP lists and color directories are not migrated automatically, and existing files are not deleted automatically. Permissions and GM status from local files come only from per-player TXT files; `tags.txt` remains a cosmetic fallback and does not grant permissions.
 
