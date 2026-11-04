@@ -1,5 +1,4 @@
-﻿using BepInEx.Unity.IL2CPP.Utils.Collections;
-using Hazel;
+﻿using Hazel;
 using InnerNet;
 
 namespace TOHE.Patches;
@@ -167,29 +166,5 @@ internal class StartGameHostPatch
     {
         if (ShipStatus.Instance != null)
             isStartingAsHost = false;
-    }
-}
-
-[HarmonyPatch]
-internal class AuthTimeoutPatch
-{
-    [HarmonyPatch(typeof(AuthManager), nameof(AuthManager.CoConnect))]
-    [HarmonyPatch(typeof(AuthManager), nameof(AuthManager.CoWaitForNonce))]
-    [HarmonyPrefix]
-    // From Reactor.gg
-    // https://github.com/NuclearPowered/Reactor/blob/master/Reactor/Patches/Miscellaneous/CustomServersPatch.cs
-    public static bool CoWaitforNoncePrefix(ref Il2CppSystem.Collections.IEnumerator __result)
-    {
-        if (GameStates.IsVanillaServer)
-        {
-            return true;
-        }
-        __result = EmptyCoroutine().WrapToIl2Cpp();
-        return false;
-    }
-
-    private static System.Collections.IEnumerator EmptyCoroutine()
-    {
-        yield break;
     }
 }
