@@ -1526,7 +1526,7 @@ class CoEnterVentPatch
     }
     public static void Postfix()
     {
-        _ = new LateTask(() => VentSystemDeterioratePatch.ForceUpadate = false, 1f, "Set Force Upadate As False", shoudLog: false);
+        _ = new LateTask(() => VentSystemDeterioratePatch.ForceUpdate = false, 1f, "Set Force Upadate As False", shoudLog: false);
     }
 }
 // Player entered in vent

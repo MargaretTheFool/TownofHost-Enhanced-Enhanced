@@ -871,7 +871,7 @@ internal class PlayerPhysicsRPCHandlerPatch
         if (!Main.MeetingIsStarted)
         {
             __instance.myPlayer.walkingToVent = true;
-            VentSystemDeterioratePatch.ForceUpadate = true;
+            VentSystemDeterioratePatch.ForceUpdate = true;
         }
 
         Logger.Info($"{player.PlayerId}({(__instance.IsHost() ? "Host" : player.Data.PlayerName)}):{callId}({RPC.GetRpcName(callId)})", "PlayerPhysics_ReceiveRPC");
