@@ -1,6 +1,8 @@
 # Town of Host: Enhanced-Enhanced (TOHEE)
 
-![TOHEE Logo](Resources/Images/LobbyPaint.png)
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+<img src="Resources/Images/LobbyPaint.png" alt="TOHEE Logo" width="300">
 
 经典的 **Host Only** 模组，基于上游 **Town of Host: Enhanced v2.1.1** 稳定版本，借助 Codex 持续改进，并适配最新版本的 Among Us。
 

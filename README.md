@@ -1,6 +1,8 @@
 # Town of Host: Enhanced-Enhanced (TOHEE)
 
-![TOHEE Logo](Resources/Images/LobbyPaint.png)
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+<img src="Resources/Images/LobbyPaint.png" alt="TOHEE Logo" width="300">
 
 A classic **Host Only** mod based on the stable **Town of Host: Enhanced v2.1.1** release, continuously improved with the help of Codex and updated to support the latest versions of Among Us.
 
