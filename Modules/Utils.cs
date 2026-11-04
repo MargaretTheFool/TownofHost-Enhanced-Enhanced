@@ -2453,11 +2453,38 @@ public static class Utils
     }
     public static void DumpLog()
     {
+        // BepInEx exposes the disk writer, but not its chosen LogOutput.N.log path.
+        string marker = $"[TOHE /dump {Guid.NewGuid():N}]";
+        bool wroteMarker = false;
+        foreach (var listener in BepInEx.Logging.Logger.Listeners)
+        {
+            if (listener is not BepInEx.Logging.DiskLogListener diskLogListener || diskLogListener.LogWriter == null) continue;
+            diskLogListener.LogWriter.WriteLine(marker);
+            diskLogListener.LogWriter.Flush();
+            wroteMarker = true;
+            break;
+        }
+        if (!wroteMarker) throw new FileNotFoundException("BepInEx disk log is unavailable.");
+
+        FileInfo file = null;
+        foreach (string path in Directory.EnumerateFiles(BepInEx.Paths.BepInExRootPath, "LogOutput*.log"))
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+            while (reader.ReadLine() is { } line)
+            {
+                if (!line.Contains(marker, StringComparison.Ordinal)) continue;
+                file = new FileInfo(path);
+                break;
+            }
+            if (file != null) break;
+        }
+        if (file == null) throw new FileNotFoundException("Active BepInEx log file was not found.");
+
         string f = $"{Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)}/TOHE-logs/";
         string t = DateTime.Now.ToString("yyyy-MM-dd_HH.mm.ss");
         string filename = $"{f}TOHE-v{Main.PluginVersion}-{t}.log";
         if (!Directory.Exists(f)) Directory.CreateDirectory(f);
-        FileInfo file = new(@$"{Environment.CurrentDirectory}/BepInEx/LogOutput.log");
         file.CopyTo(@filename);
 
         if (PlayerControl.LocalPlayer != null)
