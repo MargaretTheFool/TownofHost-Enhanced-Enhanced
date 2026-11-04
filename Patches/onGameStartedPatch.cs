@@ -337,6 +337,7 @@ internal class StartGameHostPatch
                     }
                 }
             }
+            GameStartProgress.HostWaitingPlayers(timer, maxTimer);
             yield return null;
             if (!Current()) yield break;
             if (stopWaiting)
@@ -347,6 +348,7 @@ internal class StartGameHostPatch
         }
         thiz.SendClientReady();
         GameStartProgress.HostPreparingOptions();
+        GameStartProgress.HostWait("StartProgress.OptionsWait", Time.time + 2f, 2f, false);
         yield return new WaitForSeconds(2f);
         if (!Current() || !OnGameJoinedPatch.IsCurrentSession(generation) || !SyncInitialGameOptions()) yield break;
         GameStartProgress.HostAssigningRoles();
@@ -581,13 +583,17 @@ internal class StartGameHostPatch
         }
 
         Logger.Info("Others assign finished", "AssignRoleTypes");
-        yield return new WaitForSeconds(GameStates.IsLocalGame ? 1f : 2f);
+        float roleWait = GameStates.IsLocalGame ? 1f : 2f;
+        GameStartProgress.HostWait("StartProgress.RoleWait", Time.time + roleWait, roleWait, false);
+        yield return new WaitForSeconds(roleWait);
 
         Logger.Info("Send rpc disconnected for all", "AssignRoleTypes");
         DataDisconnected.Clear();
         RpcSetDisconnected(disconnected: true);
 
-        yield return new WaitForSeconds(GameStates.IsLocalGame ? 2f : 4f);
+        float safetyWait = GameStates.IsLocalGame ? 2f : 4f;
+        GameStartProgress.HostWait("StartProgress.FinalWait", Time.time + safetyWait, safetyWait, false);
+        yield return new WaitForSeconds(safetyWait);
 
         Logger.Info("Assign self", "AssignRoleTypes");
         SetRoleSelf();
@@ -918,7 +924,16 @@ public static class RpcSetRoleReplacer
     {
         BlockSetRole = false;
         if (OfficialAnticheatPolicy.Enabled) return;
-        Senders.Do(kvp => kvp.Value.SendMessage());
+        int sent = 0;
+        int total = Senders.Values.Sum(sender => sender.RecordCount);
+        GameStartProgress.HostRoleViews(sent, total);
+        foreach (var kvp in Senders)
+        {
+            int count = kvp.Value.RecordCount;
+            kvp.Value.SendMessage();
+            sent += count;
+            GameStartProgress.HostRoleViews(sent, total);
+        }
     }
     public static void EndReplace()
     {

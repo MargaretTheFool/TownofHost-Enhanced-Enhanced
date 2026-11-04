@@ -35,6 +35,7 @@ public class CustomRpcSender : IDisposable
     private readonly OfficialPacketBuilder.BoundedWriter writerOwner;
     private static readonly HashSet<CustomRpcSender> Active = new();
     private readonly List<OfficialPacketCodec.Record> records = new();
+    internal int RecordCount => records.Count;
     private int childOffset;
 
     private CustomRpcSender() { }

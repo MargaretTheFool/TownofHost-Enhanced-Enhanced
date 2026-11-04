@@ -254,6 +254,8 @@ internal static class CustomRpcTransport
     internal static bool BarrierCancelled(int capturedGeneration) => capturedGeneration != generation;
     internal static bool BarrierComplete(int capturedGeneration, long through)
         => capturedGeneration == generation && !Queued.Keys.Any(value => value <= through);
+    internal static int BarrierPendingCount(int capturedGeneration, long through)
+        => capturedGeneration == generation ? Queued.Keys.Count(value => value <= through) : 0;
     internal static void BeginNativePacket(MessageWriter writer) => Packets[writer.Pointer] = new();
     internal static void RecordSerialized(MessageWriter writer, TOHERpcMessage message)
     {
@@ -311,4 +313,5 @@ internal sealed class RpcSendBarrier(int generation, long sequence)
 {
     internal bool IsComplete => CustomRpcTransport.BarrierComplete(generation, sequence);
     internal bool IsCancelled => CustomRpcTransport.BarrierCancelled(generation);
+    internal int PendingCount => CustomRpcTransport.BarrierPendingCount(generation, sequence);
 }

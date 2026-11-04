@@ -24,6 +24,8 @@ internal static class RoleDistribution
     internal static bool BlocksOrdinaryRoleChanges => IsActive && !GameplayReady;
     internal static bool IsMaskActive => mask?.Active == true;
     internal static RoleDistributionPlan Plan { get; private set; }
+    internal static int ReceivedRoleViews => receiver?.Subjects.Count ?? 0;
+    internal static int ExpectedRoleViews => receiver?.Count ?? 0;
     private static OfficialSessionContext context;
     private static StartDisconnectedMask mask;
     private static Dictionary<byte, PlayerControl> players;
@@ -127,6 +129,7 @@ internal static class RoleDistribution
         // Custom roles, add-ons and initial options are causal dependencies of
         // direct vanilla publication, so flush and await their actual sends.
         var settingsBarrier = CustomRpcTransport.CaptureBarrier();
+        GameStartProgress.HostBarrier("StartProgress.SettingsSending", settingsBarrier);
         while (!settingsBarrier.IsComplete)
         {
             RequireCurrent();
@@ -135,9 +138,10 @@ internal static class RoleDistribution
         }
         RequireCurrent();
         Phase = RoleDistributionPhase.SendingNonHostRoles;
-        SendRoles(hostOnly: false);
+        int roleViews = SendRoles(hostOnly: false);
         CustomRpcTransport.FlushPending();
         var nonHostBarrier = CustomRpcTransport.CaptureBarrier();
+        GameStartProgress.HostBarrier("StartProgress.RoleSending", nonHostBarrier, roleViews);
         while (!nonHostBarrier.IsComplete)
         {
             RequireCurrent();
@@ -163,6 +167,7 @@ internal static class RoleDistribution
         // delay after the final submission; direct sends need no extra wait.
         Phase = RoleDistributionPhase.Waiting3Seconds;
         float releaseAt = Time.realtimeSinceStartup + 3f;
+        GameStartProgress.HostWait("StartProgress.SafeWait", releaseAt, 3f, true);
         while (Time.realtimeSinceStartup < releaseAt)
         {
             RequireCurrent();
@@ -173,9 +178,10 @@ internal static class RoleDistribution
         // Queue modded final views through the native reliable queue first.
         // Direct vanilla publication and local host commit then form one
         // synchronous segment after that queue's actual-send barrier.
-        SendRoles(hostOnly: true, moddedOnly: true);
+        roleViews = SendRoles(hostOnly: true, moddedOnly: true);
         CustomRpcTransport.FlushPending();
         var hostBarrier = CustomRpcTransport.CaptureBarrier();
+        GameStartProgress.HostBarrier("StartProgress.HostRoleSending", hostBarrier, roleViews);
         while (!hostBarrier.IsComplete)
         {
             RequireCurrent();
@@ -186,12 +192,16 @@ internal static class RoleDistribution
         SendRoles(hostOnly: true, moddedOnly: false);
         Apply(players[Plan.HostPlayerId], Plan.DesiredNativeRole[(Plan.HostPlayerId, Plan.HostPlayerId)], true);
         Phase = RoleDistributionPhase.RestoringStartMask;
-        foreach (var id in GameData.Instance.AllPlayers.ToArray().Select(info => info.PlayerId).OrderBy(id => id).ToArray())
+        var restoreIds = GameData.Instance.AllPlayers.ToArray().Select(info => info.PlayerId).OrderBy(id => id).ToArray();
+        int restored = 0;
+        GameStartProgress.HostCount("StartProgress.Restoring", restored, restoreIds.Length);
+        foreach (var id in restoreIds)
         {
             RequireCurrent();
             var info = mask.Restore(id);
             if (info != null) SendPlayerInfo(info);
             mask.CommitRestore(id);
+            GameStartProgress.HostCount("StartProgress.Restoring", ++restored, restoreIds.Length);
             yield return null;
         }
         RequireCurrent();
@@ -199,6 +209,7 @@ internal static class RoleDistribution
             SendNative(recipient, Plan.HostPlayerId, 2);
         CustomRpcTransport.FlushPending();
         var restoreBarrier = CustomRpcTransport.CaptureBarrier();
+        GameStartProgress.HostBarrier("StartProgress.RestoreSending", restoreBarrier);
         while (!restoreBarrier.IsComplete)
         {
             RequireCurrent();
@@ -211,10 +222,11 @@ internal static class RoleDistribution
         RpcSetRoleReplacer.EndReplace();
     }
 
-    private static void SendRoles(bool hostOnly, bool? moddedOnly = null)
+    private static int SendRoles(bool hostOnly, bool? moddedOnly = null)
     {
         var vanilla = CustomRpcSender.Create("Initial native role distribution", SendOption.Reliable);
         bool wrote = false;
+        int roleViews = 0;
         try
         {
             foreach (var recipient in players.Values.Where(player => !player.AmOwner &&
@@ -230,8 +242,10 @@ internal static class RoleDistribution
                             .Write((ushort)Plan.DesiredNativeRole[(recipient.PlayerId, subject)]).Write(true).EndRpc();
                         wrote = true;
                     }
+                    roleViews++;
                 }
             if (wrote) vanilla.SendMessage();
+            return roleViews;
         }
         finally { vanilla.Dispose(); }
     }
