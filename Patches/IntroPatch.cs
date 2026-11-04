@@ -29,6 +29,7 @@ class CoShowIntroPatch
         try
         {
             if (!context.IsCurrent() || RoleDistribution.IsActive && !RoleDistribution.NotifyIntroStarted()) yield break;
+            GameStartProgress.Reset();
             ScheduleIntro();
             while (context.IsCurrent() && original.MoveNext()) yield return original.Current;
         }
