@@ -233,7 +233,8 @@ internal class RPCHandlerPatch
                 if (canceled) return false;
                 if (AmongUsClient.Instance.AmHost && !__instance.AmOwner)
                     ChatManager.RecordPlayerChat(__instance, text,
-                        textHasNamePadding: !OfficialAnticheatPolicy.Enabled && __instance.IsModded());
+                        textHasNamePadding: __instance.IsModded() &&
+                            (!OfficialAnticheatPolicy.Enabled || text.StartsWith("\n")));
                 break;
             case RpcCalls.SendQuickChat:
                 Logger.Info($"{__instance.GetNameWithRole().RemoveHtmlTags()}:Some message from quick chat", "ReceiveChat");

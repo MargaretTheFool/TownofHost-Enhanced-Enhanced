@@ -247,7 +247,7 @@ public static class MainMenuManagerPatch
             cloudButtonText.characterSpacing = 0f;
             cloudButtonText.rectTransform.sizeDelta = new Vector2(1.16f, 0.87f);
         }
-        cloudButton.gameObject.SetActive(true);
+        cloudButton.gameObject.SetActive(false);
 
         var howToPlayButton = __instance.howToPlayButton;
         var freeplayButton = howToPlayButton.transform.parent.Find("FreePlayButton");
@@ -265,6 +265,13 @@ public static class MainMenuManagerPatch
     {
         CustomSoundMenu.Update();
         CloudMenu.Update();
+        if (cloudButton != null)
+        {
+            var eos = EOSManager.Instance;
+            bool loginFinished = eos && eos.HasFinishedLoginFlow();
+            if (cloudButton.gameObject.activeSelf != loginFinished)
+                cloudButton.gameObject.SetActive(loginFinished);
+        }
         if (cloudButtonText != null)
         {
             string label = CloudService.MainMenuAccountLabel;
