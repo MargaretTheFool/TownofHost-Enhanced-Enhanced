@@ -191,6 +191,7 @@ class DisconnectInternalPatch
 {
     public static void Prefix(InnerNetClient __instance, [HarmonyArgument(0)] DisconnectReasons reason, [HarmonyArgument(1)] string stringReason)
     {
+        OfficialHazelSendHistory.OnDisconnect(reason);
         // ExitGame calls DisconnectInternal directly, without OnDisconnected.
         BanManager.ClearSessionBans();
         CheckMurderPatch.LastKillAttemptTime.Clear();

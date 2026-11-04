@@ -46,6 +46,7 @@ internal static class ServerRegion
 
     public static void BeginConnection(int gameId, string address, ushort port)
     {
+        OfficialHazelSendHistory.Reset();
         var fromLookup = foundRegion != null && foundGameId == gameId &&
                          foundAddress == address && foundPort == port;
         connectedRegion = fromLookup ? foundRegion : ServerManager.Instance?.CurrentRegion?.Duplicate();
