@@ -10,7 +10,6 @@
   "OfficialAnticheatSupport": "官方反作弊兼容",
   "OfficialAnticheatForced": "已强制启用",
   "OfficialAnticheatNextLobby": "已保存，将在下个房间生效。",
-  "StartProgress.Stage": "当前阶段：{0}",
   "StartProgress.LocalPlayer": "正在准备本地玩家",
   "StartProgress.Map": "正在加载地图",
   "StartProgress.Players": "已准备 {0}/{1} 个玩家",

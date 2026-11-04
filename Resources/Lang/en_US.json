@@ -10,7 +10,6 @@
   "OfficialAnticheatSupport": "Official Anticheat Support",
   "OfficialAnticheatForced": "Forced on",
   "OfficialAnticheatNextLobby": "Change saved; takes effect in the next lobby.",
-  "StartProgress.Stage": "Current stage: {0}",
   "StartProgress.LocalPlayer": "Preparing local player",
   "StartProgress.Map": "Loading map",
   "StartProgress.Players": "Players ready: {0}/{1}",
