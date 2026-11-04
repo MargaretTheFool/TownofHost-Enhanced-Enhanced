@@ -8,12 +8,14 @@ Steam、Epic Games、Microsoft Store 的 19.0 客户端均使用 x64 包；
 已有其他模组时，建议使用单独的干净游戏副本，避免混用加载器和插件。
 首次启动需要 BepInEx 生成该安装的 interop，可能需要等待和联网下载 Unity 库。
 首次运行时，附带的 Remove GC Max Time Slice 插件可能会移除启动配置并关闭游戏；重新启动即可。
+已有旧版整合包升级时，也请将 BepInEx/patchers/Il2CppInteropGcFix.dll 放入对应目录。
 以后仅更新模组时，在同一 BepInEx 755 环境中替换 BepInEx/plugins/TOHE.dll。
 本包中的 steam_appid.txt 供 Steam 使用，其他商店无需操作此文件。
 
 Extract all files beside Among Us.exe with the game closed.
 Use x64 for Steam / Epic Games / Microsoft Store; x86 for itch.io only.
 The first launch generates interop assemblies for your own game installation.
+When upgrading an older bundle, also copy BepInEx/patchers/Il2CppInteropGcFix.dll into the corresponding directory.
 On its first run, the bundled Remove GC Max Time Slice plugin may update the startup config and close the game; launch it again afterward.
 Do not copy another store's generated interop directory.
 
@@ -24,7 +26,8 @@ Source commit: @COMMIT@
 BepInEx 6.0.0-be.755: https://github.com/BepInEx/BepInEx/tree/3fab71a1914132a1ce3a545caf3192da603f2258
 Mini.RegionInstall 1.2.0 (GPL-3.0): https://github.com/miniduikboot/Mini.RegionInstall/tree/v1.2.0
 RemoveGcMaxTimeSlice 1.0.0 (MIT): https://github.com/Pietrodjaowjao/RemoveGcMaxTimeSlice/releases/tag/1.0.0
+Il2CppInteropGcFix 1.0.0 (LGPL-3.0): https://github.com/AU-Avengers/Il2CppInteropGcFix/tree/e63d68fb48e63e079bd7fe853b1e6aded857d74a
 The BepInEx archive's original runtime files and changelog are retained.
-See LICENSE.TOHEE.txt for TOHEE and Mini.RegionInstall terms, and LICENSE.RemoveGcMaxTimeSlice.txt for the bundled plugin's MIT terms.
+See LICENSE.TOHEE.txt for TOHEE and Mini.RegionInstall terms, LICENSE.RemoveGcMaxTimeSlice.txt for the bundled plugin's MIT terms, and LICENSE.Il2CppInteropGcFix.txt for the patcher's LGPL-3.0 terms.
 
 This package contains the mod and loader, and does not contain Among Us.

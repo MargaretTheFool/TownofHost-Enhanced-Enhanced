@@ -15,6 +15,14 @@
     "url": "https://github.com/miniduikboot/Mini.RegionInstall/releases/download/v1.2.0/Mini.RegionInstall.dll",
     "sha256": "9015448B849CBE5EDF71A62D77B32E16786E4515919751C2078062046F7DE98B"
   },
+  "il2cpp-interop-gc-fix": {
+    "file": "Il2CppInteropGcFix.dll",
+    "url": "https://github.com/AU-Avengers/Il2CppInteropGcFix/releases/download/v1.0.0/Il2CppInteropGcFix.dll",
+    "sha256": "AA52E57ACC30336B362F0D0F73D43EBB6F2B8DE60A0751EF57B8CD1A94875593",
+    "version": "1.0.0",
+    "repository": "https://github.com/AU-Avengers/Il2CppInteropGcFix/tree/e63d68fb48e63e079bd7fe853b1e6aded857d74a",
+    "license": "LGPL-3.0"
+  },
   "remove-gc-max-time-slice": {
     "file": "RemoveGcMaxTimeSlice.Plugin.dll",
     "url": "https://github.com/Pietrodjaowjao/RemoveGcMaxTimeSlice/releases/download/1.0.0/RemoveGcMaxTimeSlice.Plugin.dll",
