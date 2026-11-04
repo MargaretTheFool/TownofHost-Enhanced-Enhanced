@@ -234,6 +234,7 @@ public static class MainMenuManagerPatch
             cloudAnchor.parentCam = Camera.main;
             cloudAnchor.Alignment = AspectPosition.EdgeAlignments.RightBottom;
             cloudAnchor.DistanceFromEdge = new Vector3(3.025f, 0.58f, -7f);
+            cloudAnchor.AdjustPosition();
             cloudButtonText = cloudButton.transform.Find("FontPlacer/Text_TMP").GetComponent<TMP_Text>();
             cloudButtonText.enableAutoSizing = true;
             cloudButtonText.fontSizeMin = 1.2f;
