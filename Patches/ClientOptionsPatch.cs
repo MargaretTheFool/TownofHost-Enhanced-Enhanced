@@ -8,7 +8,7 @@ public static class CustomSoundOptionsMenuOpenPatch
 {
     public static void Postfix()
     {
-        CustomSoundMenu.SetMenuVisible(false);
+        CustomSoundMenu.Close();
         CloudMenu.Close();
     }
 }
@@ -17,8 +17,6 @@ public static class CustomSoundOptionsMenuOpenPatch
 public static class CustomSoundOptionsMenuClosePatch
 {
     public static void Prefix() => CustomSoundMenu.Close();
-    public static void Postfix() => CustomSoundMenu.SyncMenuVisibility(
-        MainMenuManagerStartPatch.ToheLogo != null && MainMenuManagerStartPatch.ToheLogo.gameObject.activeInHierarchy);
 }
 
 //��Դ��https://github.com/tukasa0001/TownOfHost/pull/1265

@@ -225,16 +225,26 @@ public static class MainMenuManagerPatch
                 new(55, 112, 153, byte.MaxValue),
                 new(100, 167, 209, byte.MaxValue),
                 (UnityEngine.Events.UnityAction)(() => CloudMenu.Open(__instance)),
-                CloudService.MainMenuAccountLabel);
-            cloudButton.transform.localScale = Vector3.one * 0.6f;
+                CloudService.MainMenuAccountLabel,
+                new Vector2(1.08f, 0.84f));
+            cloudButton.transform.SetParent(__instance.mainMenuUI.transform, false);
+            cloudButton.transform.localPosition = Vector3.zero;
+            cloudButton.transform.localScale = new Vector3(0.85f, 0.85f, 1f);
             var cloudAnchor = cloudButton.gameObject.AddComponent<AspectPosition>();
             cloudAnchor.parentCam = Camera.main;
             cloudAnchor.Alignment = AspectPosition.EdgeAlignments.RightBottom;
-            cloudAnchor.DistanceFromEdge = new Vector3(4.8f, 0.58f, -7f);
+            cloudAnchor.DistanceFromEdge = new Vector3(3.025f, 0.58f, -7f);
             cloudButtonText = cloudButton.transform.Find("FontPlacer/Text_TMP").GetComponent<TMP_Text>();
             cloudButtonText.enableAutoSizing = true;
-            cloudButtonText.fontSizeMin = 1.5f;
-            cloudButtonText.fontSizeMax = 3.5f;
+            cloudButtonText.fontSizeMin = 1.2f;
+            cloudButtonText.fontSizeMax = 2.8f;
+            cloudButtonText.enableWordWrapping = true;
+            cloudButtonText.alignment = TextAlignmentOptions.Center;
+            cloudButtonText.lineSpacing = 0f;
+            cloudButtonText.paragraphSpacing = 0f;
+            cloudButtonText.wordSpacing = 0f;
+            cloudButtonText.characterSpacing = 0f;
+            cloudButtonText.rectTransform.sizeDelta = new Vector2(1.16f, 0.87f);
         }
         cloudButton.gameObject.SetActive(true);
 
@@ -362,7 +372,7 @@ public static class MainMenuManagerPatch
     [HarmonyPostfix]
     public static void OpenMenu_Postfix()
     {
-        CustomSoundMenu.SetMenuVisible(false);
+        CustomSoundMenu.Close();
         CloudMenu.Close();
         if (MainMenuManagerStartPatch.ToheLogo != null) MainMenuManagerStartPatch.ToheLogo.gameObject.SetActive(false);
     }
@@ -370,13 +380,12 @@ public static class MainMenuManagerPatch
     public static void ResetScreen_Postfix()
     {
         if (MainMenuManagerStartPatch.ToheLogo != null) MainMenuManagerStartPatch.ToheLogo.gameObject.SetActive(true);
-        CustomSoundMenu.SyncMenuVisibility(MainMenuManagerStartPatch.ToheLogo != null && MainMenuManagerStartPatch.ToheLogo.gameObject.activeInHierarchy);
     }
 
     [HarmonyPatch("DeactivateMainMenuUI"), HarmonyPostfix]
     public static void DeactivateMainMenuUI_Postfix()
     {
-        CustomSoundMenu.SetMenuVisible(false);
+        CustomSoundMenu.Close();
         CloudMenu.Close();
     }
 }
