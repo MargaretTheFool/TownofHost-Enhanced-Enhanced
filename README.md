@@ -14,6 +14,8 @@ Through this project, the developer is actively exploring the possibilities of A
 
 **QQ Group:** 975714136
 
+If you encounter any issues while playing the mod, please feedback with the above methods. We value your feedback and we are there to help!
+
 ## Why TOHEE?
 
 - **The Authentic TOHE Experience:** Maintained by a former Lead Developer of TOHE, preserving the classic gameplay experience players know and love.
