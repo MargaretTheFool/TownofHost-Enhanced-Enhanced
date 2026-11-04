@@ -1120,7 +1120,7 @@ public static class Options
         AutoDisplayLastResult = BooleanOptionItem.Create(60290, "AutoDisplayLastResult", true, TabGroup.SystemSettings, false)
             .HideInHnS();
 
-        SuffixMode = StringOptionItem.Create(60300, "SuffixMode", suffixModes, 0, TabGroup.SystemSettings, true)
+        SuffixMode = StringOptionItem.Create(60300, "SuffixMode", suffixModes, 0, TabGroup.SystemSettings, false)
             .SetHeader(true);
         HideHostText = BooleanOptionItem.Create(60311, "HideHostText", false, TabGroup.SystemSettings, false);
         HideAllTagsAndText = BooleanOptionItem.Create(60312, "HideAllTagsAndText", false, TabGroup.SystemSettings, false);
@@ -1159,7 +1159,7 @@ public static class Options
             .SetHeader(true)
             .SetColor(new Color32(255, 192, 203, byte.MaxValue));
         //DebugModeManager.SetupCustomOption();
-        EnableUpMode = BooleanOptionItem.Create(60430, "EnableYTPlan", false, TabGroup.SystemSettings, false)
+        EnableUpMode = BooleanOptionItem.Create(60430, "EnableYTPlan", false, TabGroup.SystemSettings, true)
             .HideInHnS()
             .SetColor(Color.cyan)
             .SetHeader(true);
@@ -1894,13 +1894,13 @@ public static class Options
             .SetGameMode(CustomGameMode.Standard)
             .SetValueFormat(OptionFormat.Seconds)
             .SetColor(new Color32(217, 218, 255, byte.MaxValue));
+
+        AfkMonitor.SetupCustomOptions();
+        CrossLanguageGetRole = BooleanOptionItem.Create(61040, "CrossLanguageGetRole", true, TabGroup.ModSettings, false);
         #endregion
 
         yield return null;
 
-        // End Load Settings
-        AfkMonitor.SetupCustomOptions();
-        CrossLanguageGetRole = BooleanOptionItem.Create(61040, "CrossLanguageGetRole", false, TabGroup.ModSettings, false);
         OptionSaver.Load();
         IsLoaded = true;
         Logger.Msg("Mod option loading eng", "Load Options");
