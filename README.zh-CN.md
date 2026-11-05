@@ -8,7 +8,7 @@
 
 以本模组为起点，开发者正积极探索 AI 辅助开发的更多可能性，致力于降低 Among Us 模组的开发门槛，让每一位玩家都有机会借助 AI 工具参与模组开发，并通过持续实践推动这一目标的实现。
 
-**官方网站：** https://tohee.niko233.top/
+**官方网站与官方文档：** https://tohee.niko233.top/
 
 **Discord 社区：** https://discord.gg/guf9ca4YSA
 
