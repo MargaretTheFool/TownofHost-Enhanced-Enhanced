@@ -21,8 +21,9 @@ internal static class CloudMenu
     private static ToggleButtonBehaviour tags;
     private static ToggleButtonBehaviour tagsRefresh;
     private static ToggleButtonBehaviour systemProxy;
+    private static ToggleButtonBehaviour lobbyButton;
     private static bool restoreOptions;
-    private static Sprite white;
+    private static bool lobbyMenu;
     private static readonly Dictionary<ToggleButtonBehaviour, bool> buttonStates = new();
     private static CloudService.MenuState? renderedState;
     private static SupportedLangs renderedLanguage;
@@ -39,12 +40,13 @@ internal static class CloudMenu
         status = null;
         roomStatus = null;
         notice = null;
-        bind = accountRefresh = manage = share = roomShare = tags = tagsRefresh = systemProxy = null;
+        bind = accountRefresh = manage = share = roomShare = tags = tagsRefresh = systemProxy = lobbyButton = null;
         buttonStates.Clear();
         renderedState = null;
         if (restoreOptions && ClientOptionItem.CustomBackground != null)
             ClientOptionItem.CustomBackground.gameObject.SetActive(true);
         restoreOptions = false;
+        lobbyMenu = false;
     }
 
     internal static void Open(OptionsMenuBehaviour options)
@@ -61,17 +63,24 @@ internal static class CloudMenu
         Open(options, menu.mainMenuUI.transform, true);
     }
 
-    private static void Open(OptionsMenuBehaviour options, Transform parent, bool mainMenu)
+    internal static void Open(HudManager hud)
+    {
+        if (panel != null || hud == null) return;
+        Open(hud.GameMenu, hud.transform, true);
+        lobbyMenu = panel != null;
+    }
+
+    private static void Open(OptionsMenuBehaviour options, Transform parent, bool standalone)
     {
         if (panel != null || options == null || options.DisableMouseMovement == null || options.DisableMouseMovement.Text == null || options.Background == null) return;
-        restoreOptions = !mainMenu && ClientOptionItem.CustomBackground != null && ClientOptionItem.CustomBackground.gameObject.activeSelf;
+        restoreOptions = !standalone && ClientOptionItem.CustomBackground != null && ClientOptionItem.CustomBackground.gameObject.activeSelf;
         if (restoreOptions) ClientOptionItem.CustomBackground.gameObject.SetActive(false);
         panel = Object.Instantiate(options.Background, parent);
         panel.name = "TOHEECloudSettings";
         panel.transform.localScale = new Vector3(0.9f, 0.9f, 1f);
-        panel.transform.localPosition = mainMenu ? new Vector3(0f, 0f, -20f) : panel.transform.localPosition + Vector3.back * 15f;
+        panel.transform.localPosition = standalone ? new Vector3(0f, 0f, -20f) : panel.transform.localPosition + Vector3.back * 15f;
         panel.gameObject.SetActive(true);
-        if (mainMenu)
+        if (standalone)
         {
             panel.gameObject.AddComponent<UnityEngine.Rendering.SortingGroup>().sortingOrder = 100;
             var blocker = new GameObject("CloudClickBlocker");
@@ -84,16 +93,6 @@ internal static class CloudMenu
             blockerButton.OnMouseOut = new();
             blockerButton.OnClick = new();
             blocker.SetActive(true);
-
-            var dimmer = new GameObject("CloudDimmer");
-            dimmer.transform.SetParent(panel.transform, false);
-            dimmer.transform.localPosition = new Vector3(0f, 0f, 0.5f);
-            var dimmerRenderer = dimmer.AddComponent<SpriteRenderer>();
-            if (!white) white = Sprite.Create(Texture2D.whiteTexture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
-            dimmerRenderer.sprite = white;
-            dimmerRenderer.drawMode = SpriteDrawMode.Sliced;
-            dimmerRenderer.size = new Vector2(30f, 20f);
-            dimmerRenderer.color = new Color(0f, 0f, 0f, 0.58f);
         }
 
         var warning = Object.Instantiate(options.DisableMouseMovement.Text, panel.transform);
@@ -138,25 +137,35 @@ internal static class CloudMenu
         notice.name = "CloudNotice";
         notice.fontSizeMin = 0.6f;
         notice.fontSizeMax = 1.2f;
-        notice.rectTransform.sizeDelta = new Vector2(4.7f, 0.36f);
-        notice.transform.localPosition = new Vector3(0f, -1.85f, -5f);
+        notice.rectTransform.sizeDelta = new Vector2(4.7f, 0.28f);
+        notice.transform.localPosition = new Vector3(0f, -1.98f, -5f);
         notice.text = CloudService.LastMessage;
 
         bind = Button("CloudBind", -1.3f, 0.38f, () => Run("/cloud bind"));
         accountRefresh = Button("CloudAccountRefresh", 1.3f, 0.38f, () => CloudService.RefreshAccount());
-        manage = Button("CloudManage", -1.3f, -0.20f, CloudService.ManageAccount);
-        share = Button("CloudShareOn", 1.3f, -0.20f,
+        manage = Button("CloudManage", -1.3f, -0.10f, CloudService.ManageAccount);
+        share = Button("CloudShareOn", 1.3f, -0.10f,
             () => Run(CloudService.ShareEnabled ? "/cloud share off" : "/cloud share on"));
-        roomShare = Button("CloudRoomShare", -1.3f, -0.78f, CloudService.ToggleRoomShare);
-        tags = Button("CloudTagsUse", 1.3f, -0.78f, () => CloudService.SetTagsEnabled(!CloudService.TagsEnabled));
-        tagsRefresh = Button("CloudTagsRefresh", -1.3f, -1.36f, CloudService.RefreshTags);
-        systemProxy = Button("CloudProxyUse", 1.3f, -1.36f, () => CloudService.SetUseSystemProxy(!CloudService.UseSystemProxy));
-        var back = Button("Back", 0f, -2.30f, Close);
+        roomShare = Button("CloudRoomShare", -1.3f, -0.58f, CloudService.ToggleRoomShare);
+        tags = Button("CloudTagsUse", 1.3f, -0.58f, () => CloudService.SetTagsEnabled(!CloudService.TagsEnabled));
+        tagsRefresh = Button("CloudTagsRefresh", -1.3f, -1.06f, CloudService.RefreshTags);
+        systemProxy = Button("CloudProxyUse", 1.3f, -1.06f, () => CloudService.SetUseSystemProxy(!CloudService.UseSystemProxy));
+        lobbyButton = Button("CloudLobbyButtonVisible", -1.3f, -1.54f,
+            () => CloudService.SetLobbyButtonEnabled(!CloudService.LobbyButtonEnabled));
+        var back = Button("Back", 0f, -2.40f, Close);
 
         CloudService.RefreshAccount();
         Refresh();
         foreach (var item in panel.GetComponentsInChildren<Transform>(true))
             item.gameObject.layer = options.DisableMouseMovement.Text.gameObject.layer;
+        if (standalone)
+        {
+            // SortingGroup children need explicit order; TMP also applies it to fallback font meshes.
+            foreach (var renderer in panel.GetComponentsInChildren<SpriteRenderer>(true))
+                renderer.sortingOrder = renderer == panel ? 0 : 1;
+            foreach (var text in panel.GetComponentsInChildren<TextMeshPro>(true))
+                text.sortingOrder = 2;
+        }
         ControllerManager.Instance?.OpenOverlayMenu(OverlayName, back.GetComponent<PassiveButton>());
 
         void Run(string command) => CloudService.TryHandleCommand(command);
@@ -189,7 +198,7 @@ internal static class CloudMenu
 
     internal static void Update()
     {
-        if (panel != null && Input.GetKeyDown(KeyCode.Escape)) Close();
+        if (panel != null && ((lobbyMenu && !GameStates.IsLobby) || Input.GetKeyDown(KeyCode.Escape))) Close();
     }
 
     internal static void Refresh()
@@ -210,12 +219,15 @@ internal static class CloudMenu
         SetButton(tags, CloudService.CanChangeTags);
         SetButton(tagsRefresh, CloudService.TagsEnabled && CloudService.CanChangeTags);
         SetButton(systemProxy, CloudService.CanChangeProxy);
+        SetButton(lobbyButton, true);
         SetText(share.Text, Translator.GetString(CloudService.ShareEnabled ? "CloudShareOff" : "CloudShareOn"));
         SetText(roomShare.Text, Translator.GetString(CloudService.RoomIsShared ? "CloudRoomStop" : "CloudRoomShare"));
         SetText(tags.Text, Translator.GetString("CloudTagsUse") + ": " +
             Translator.GetString(CloudService.TagsEnabled ? "CloudOptionOn" : "CloudOptionOff"));
         SetText(systemProxy.Text, Translator.GetString("CloudProxyUse") + ": " +
             Translator.GetString(CloudService.UseSystemProxy ? "CloudOptionOn" : "CloudOptionOff"));
+        SetText(lobbyButton.Text, Translator.GetString("CloudLobbyButtonVisible") + ": " +
+            Translator.GetString(CloudService.LobbyButtonEnabled ? "CloudOptionOn" : "CloudOptionOff"));
     }
 
     private static void SetButton(ToggleButtonBehaviour button, bool enabled)

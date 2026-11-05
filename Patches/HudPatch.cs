@@ -25,6 +25,8 @@ class HudManagerPatch
     public static void Postfix(HudManager __instance)
     {
         CustomSoundMenu.Update();
+        CloudMenu.Update();
+        CloudLobbyButton.Update(__instance);
         FeatureChatCommands.UpdateSession();
         FeatureChatCommands.CheckTagChanges();
         BlackScreenFix.Tick();

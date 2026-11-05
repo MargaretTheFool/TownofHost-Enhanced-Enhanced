@@ -18,12 +18,13 @@ internal static class CloudService
     internal readonly record struct MenuState(bool UserAgentReady, string UserAgent, bool HasIdentity,
         bool AccountLoading, bool AccountRequestInFlight, CloudAccount.State Account, string AccountError, bool TagsLoading,
         bool OnlineRoom, bool CurrentRoom, bool IsHost, CloudRooms.SharingStatus Room,
-        bool RoomManuallyStopped, bool ShareEnabled, bool TagsEnabled, bool UseSystemProxy);
+        bool RoomManuallyStopped, bool ShareEnabled, bool TagsEnabled, bool UseSystemProxy, bool LobbyButtonEnabled);
     private static readonly HttpClient systemProxyHttp = new(new HttpClientHandler { UseProxy = true }) { Timeout = TimeSpan.FromSeconds(10) };
     private static readonly HttpClient directHttp = new(new HttpClientHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(10) };
     private static readonly Uri Origin = new("https://tohee.niko233.top/");
     private static ConfigEntry<bool> shareRooms;
     private static ConfigEntry<bool> systemProxy;
+    private static ConfigEntry<bool> showLobbyButton;
     private static volatile bool useSystemProxy = true;
     private static Uri accountOrigin;
     private static string accountToken;
@@ -50,6 +51,7 @@ internal static class CloudService
     internal static bool ShareEnabled => shareRooms?.Value == true;
     internal static bool TagsEnabled => CloudTags.Enabled;
     internal static bool UseSystemProxy => useSystemProxy;
+    internal static bool LobbyButtonEnabled => showLobbyButton?.Value != false;
     private static bool IsCurrentRoom
     {
         get
@@ -71,6 +73,8 @@ internal static class CloudService
     internal static bool CanChangeTags => !IsBusy;
     internal static bool CanChangeProxy => !IsBusy;
     internal static bool RoomIsShared => RoomStatus.IsShared;
+    internal static bool ShowLobbyButton => LobbyButtonEnabled && GameStates.IsLobby && GameStates.IsOnlineGame
+        && CloudAccount.DisplayState is { Bound: true, SharingEnabled: true };
     internal static bool CanChangeRoomShare => IsCurrentRoom && AmongUsClient.Instance.AmHost
         && !IsBusy && (RoomIsShared || (ShareEnabled && CanEnableShare));
     internal static bool CanManage => !IsBusy;
@@ -104,12 +108,14 @@ internal static class CloudService
         var room = CloudRooms.GetStatus(currentRoom ? sessionRoomKey : null);
         return new(userAgentReady, userAgent, accountToken != null && accountPuid != null,
             CloudAccount.IsLoading, CloudAccount.IsRequestInFlight, CloudAccount.Current, CloudAccount.Error, CloudTags.IsLoading,
-            onlineRoom, currentRoom, onlineRoom && client.AmHost, room, roomManuallyStopped, ShareEnabled, TagsEnabled, UseSystemProxy);
+            onlineRoom, currentRoom, onlineRoom && client.AmHost, room, roomManuallyStopped, ShareEnabled, TagsEnabled, UseSystemProxy,
+            LobbyButtonEnabled);
     }
 
     internal static void Initialize(ConfigFile config)
     {
         shareRooms = config.Bind("TOHEE Cloud", "Share rooms", false, "Room codes become visible to eligible Cloud users and authorized API callers.");
+        showLobbyButton = config.Bind("TOHEE Cloud", "Show lobby button", true, "Show the Cloud button in online lobbies.");
         if (systemProxy != null) systemProxy.SettingChanged -= OnSystemProxyChanged;
         systemProxy = config.Bind("TOHEE Cloud", "Use system proxy", true, "Use the default system proxy for Cloud HTTP requests; disable to connect directly.");
         systemProxy.SettingChanged += OnSystemProxyChanged;
@@ -119,6 +125,12 @@ internal static class CloudService
     }
 
     private static void OnSystemProxyChanged(object sender, EventArgs args) => useSystemProxy = systemProxy.Value;
+
+    internal static void SetLobbyButtonEnabled(bool enabled)
+    {
+        showLobbyButton.Value = enabled;
+        CloudMenu.Refresh();
+    }
 
     private static void ReadIdentity(out string token, out string puid)
     {
@@ -450,22 +462,22 @@ internal static class CloudService
         return account + "\n" + sharing + tag;
     }
 
-    internal static string RoomStatusText()
+    internal static string RoomStatusText(bool compact = false)
     {
         var client = AmongUsClient.Instance;
         if (!client || !client.AmConnected || !GameStates.IsOnlineGame)
             return Translator.GetString("CloudRoomStatusNoRoom");
 
         var state = RoomStatus;
-        return Translator.GetString(state.Operation switch
+        return Translator.GetString((compact ? "CloudLobbyStatus" : "CloudRoomStatus") + (state.Operation switch
         {
-            CloudRooms.RequestOperation.Create => "CloudRoomStatusSharing",
-            CloudRooms.RequestOperation.Update when state.IsShared => "CloudRoomStatusUpdating",
-            CloudRooms.RequestOperation.Update => "CloudRoomStatusSharing",
-            CloudRooms.RequestOperation.Delete => "CloudRoomStatusStopping",
-            _ when state.IsShared && roomManuallyStopped => "CloudRoomStatusStopPending",
-            _ => state.IsShared ? "CloudRoomStatusShared" : "CloudRoomStatusNotShared"
-        });
+            CloudRooms.RequestOperation.Create => "Sharing",
+            CloudRooms.RequestOperation.Update when state.IsShared => "Updating",
+            CloudRooms.RequestOperation.Update => "Sharing",
+            CloudRooms.RequestOperation.Delete => "Stopping",
+            _ when state.IsShared && roomManuallyStopped => "StopPending",
+            _ => state.IsShared ? "Shared" : "NotShared"
+        }));
     }
 
     private static string SharingReason(string reason) => Translator.GetString(reason switch
