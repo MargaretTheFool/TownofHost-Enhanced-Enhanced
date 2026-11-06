@@ -114,8 +114,8 @@ internal static class ManagementCommands
     {
         try
         {
-            Directory.CreateDirectory("TOHEE-DATA");
-            File.AppendAllText(Path.Combine("TOHEE-DATA", "ModLogs.txt"), $"[{DateTime.Now:O}] {message}{Environment.NewLine}");
+            Directory.CreateDirectory(DataDirectoryMigration.DataDirectory);
+            File.AppendAllText(Path.Combine(DataDirectoryMigration.DataDirectory, "ModLogs.txt"), $"[{DateTime.Now:O}] {message}{Environment.NewLine}");
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {

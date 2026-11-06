@@ -2,6 +2,7 @@ using AmongUs.GameOptions;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
 using System;
 using System.IO;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,6 +18,9 @@ namespace TOHE;
 [HarmonyPatch(typeof(HudManager), nameof(HudManager.CoShowIntro))]
 class CoShowIntroPatch
 {
+#if ANDROID
+    public static bool Prepare() => AndroidIntroStateMachines.ShowIntroMoveNext == null;
+#endif
     public static void Postfix(ref Il2CppSystem.Collections.IEnumerator __result)
     {
         if (__result != null) __result = Run(__result, OfficialSessionContext.Capture()).WrapToIl2Cpp();
@@ -29,6 +33,9 @@ class CoShowIntroPatch
         try
         {
             if (!context.IsCurrent() || RoleDistribution.IsActive && !RoleDistribution.NotifyIntroStarted()) yield break;
+#if ANDROID
+            AndroidIntroTextFallbackPatch.MarkIntroStarted();
+#endif
             GameStartProgress.Reset();
             ScheduleIntro();
             while (context.IsCurrent() && original.MoveNext()) yield return original.Current;
@@ -36,7 +43,7 @@ class CoShowIntroPatch
         finally { original.TryCast<Il2CppSystem.IDisposable>()?.Dispose(); }
     }
 
-    private static void ScheduleIntro()
+    internal static void ScheduleIntro()
     {
         if (!AmongUsClient.Instance.AmHost || !GameStates.IsModHost || GameStates.IsHideNSeek) return;
         var generation = OnGameJoinedPatch.Generation;
@@ -106,20 +113,239 @@ class CoShowIntroPatch
 [HarmonyPatch(typeof(IntroCutscene), nameof(IntroCutscene.CoBegin))]
 class CoBeginPatch
 {
+#if ANDROID
+    public static bool Prepare() => AndroidIntroStateMachines.BeginMoveNext == null;
+
+    public static void Postfix(ref Il2CppSystem.Collections.IEnumerator __result)
+    {
+        if (__result != null) __result = CompleteIntro(__result, OfficialSessionContext.Capture()).WrapToIl2Cpp();
+    }
+
+    private static System.Collections.IEnumerator CompleteIntro(Il2CppSystem.Collections.IEnumerator original, OfficialSessionContext context)
+    {
+        try
+        {
+            while (context.IsCurrent() && original.MoveNext()) yield return original.Current;
+            if (!context.IsCurrent()) yield break;
+            IntroCutsceneDestroyPatch.Prefix();
+            IntroCutsceneDestroyPatch.Postfix();
+            AndroidIntroTextFallbackPatch.MarkIntroCompleted();
+        }
+        finally { original.TryCast<Il2CppSystem.IDisposable>()?.Dispose(); }
+    }
+#endif
     public static void Prefix()
     {
+#if ANDROID
+        AndroidIntroTextFallbackPatch.MarkBeginStarted();
+#endif
         GameStates.InGame = true;
         RPC.RpcVersionCheck();
 
         FFAManager.SetData();
     }
 }
+#if ANDROID
+// Android can inline the iterator factories. Prefer the native iterator entry
+// when the runtime interop exposes it; keep the factory patches as a fallback.
+internal static class AndroidIntroStateMachines
+{
+    internal static readonly MethodInfo ShowIntroMoveNext = FindMoveNext(typeof(HudManager), "CoShowIntro");
+    internal static readonly MethodInfo BeginMoveNext = FindMoveNext(typeof(IntroCutscene), "CoBegin");
+
+    private static MethodInfo FindMoveNext(Type owner, string name)
+    {
+        var type = owner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
+            .FirstOrDefault(candidate => candidate.Name.StartsWith("_" + name + "_d__", StringComparison.Ordinal));
+        var method = type == null ? null : AccessTools.DeclaredMethod(type, "MoveNext");
+        if (method != null && AccessTools.Property(type, "__1__state") == null) method = null;
+        if (method == null) Logger.Warn($"{owner.Name}.{name}.MoveNext is unavailable; using the coroutine factory", "AndroidIntro");
+        return method;
+    }
+}
+
+[HarmonyPatch]
+internal static class AndroidShowIntroPatch
+{
+    private static readonly Dictionary<IntPtr, OfficialSessionContext> Contexts = new();
+    private static PropertyInfo state;
+
+    public static bool Prepare() => AndroidIntroStateMachines.ShowIntroMoveNext != null;
+    public static MethodBase TargetMethod()
+    {
+        var method = AndroidIntroStateMachines.ShowIntroMoveNext;
+        state = AccessTools.Property(method.DeclaringType, "__1__state");
+        return method;
+    }
+
+    public static bool Prefix(Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase __instance, ref bool __result)
+    {
+        if ((int)state.GetValue(__instance) == 0)
+        {
+            Contexts.Clear();
+            var context = OfficialSessionContext.Capture();
+            if (!context.IsCurrent() || RoleDistribution.IsActive && !RoleDistribution.NotifyIntroStarted())
+            {
+                __result = false;
+                return false;
+            }
+            Contexts[__instance.Pointer] = context;
+            GameStartProgress.Reset();
+            CoShowIntroPatch.ScheduleIntro();
+        }
+        if (Contexts.TryGetValue(__instance.Pointer, out var current) && current.IsCurrent()) return true;
+        Contexts.Remove(__instance.Pointer);
+        __result = false;
+        return false;
+    }
+
+    public static void Postfix(Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase __instance, bool __result)
+    {
+        if (!__result) Contexts.Remove(__instance.Pointer);
+    }
+}
+
+[HarmonyPatch]
+internal static class AndroidIntroCompletionPatch
+{
+    private static PropertyInfo state;
+
+    public static bool Prepare() => AndroidIntroStateMachines.BeginMoveNext != null;
+    public static MethodBase TargetMethod()
+    {
+        var method = AndroidIntroStateMachines.BeginMoveNext;
+        state = AccessTools.Property(method.DeclaringType, "__1__state");
+        return method;
+    }
+
+    public static void Prefix(Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase __instance)
+    {
+        if ((int)state.GetValue(__instance) == 0) CoBeginPatch.Prefix();
+    }
+
+    public static void Postfix(bool __result)
+    {
+        if (__result || !GameStates.IsInGame) return;
+        IntroCutsceneDestroyPatch.Prefix();
+        IntroCutsceneDestroyPatch.Postfix();
+    }
+}
+#endif
+[HarmonyPatch]
+internal static class ShowRoleMoveNextPatch
+{
+    private static readonly Type StateMachine = typeof(IntroCutscene).GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
+        .FirstOrDefault(type => type.Name.StartsWith("_ShowRole_d__", StringComparison.Ordinal));
+    internal static readonly MethodInfo MoveNext = StateMachine == null ? null : AccessTools.DeclaredMethod(StateMachine, "MoveNext");
+    private static readonly PropertyInfo State = StateMachine == null ? null : AccessTools.Property(StateMachine, "__1__state");
+    private static readonly PropertyInfo Owner = StateMachine == null ? null : AccessTools.Property(StateMachine, "__4__this");
+
+    public static bool Prepare() => MoveNext != null && State != null && Owner != null;
+    public static MethodBase TargetMethod() => MoveNext;
+
+    public static void Postfix(Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase __instance, bool __result)
+    {
+        // The native iterator has just assigned and shown the vanilla text.
+        if (__result && (int)State.GetValue(__instance) == 1)
+            SetUpRoleTextPatch.Postfix((IntroCutscene)Owner.GetValue(__instance));
+    }
+}
+
+#if !ANDROID
 [HarmonyPatch(typeof(IntroCutscene), nameof(IntroCutscene.ShowRole))]
+internal static class ShowRoleFactoryFallbackPatch
+{
+    public static bool Prepare() => !ShowRoleMoveNextPatch.Prepare();
+    public static void Postfix(IntroCutscene __instance) => SetUpRoleTextPatch.Postfix(__instance, roleInitialized: false);
+}
+#else
+[HarmonyPatch(typeof(HudManager), nameof(HudManager.Update))]
+internal static class AndroidIntroTextFallbackPatch
+{
+    private static IntroCutscene intro;
+    private static IntroCutscene styledTeam;
+    private static Color styledTeamColor;
+    private static bool applied;
+    private static bool introStarted, beginStarted, sawIntro, completed;
+    private static OfficialSessionContext introContext;
+
+    internal static void MarkTeamApplied(IntroCutscene cutscene)
+    {
+        styledTeam = cutscene;
+        styledTeamColor = cutscene.TeamTitle.color;
+    }
+    internal static void MarkIntroStarted() => introStarted = true;
+    internal static void MarkIntroCompleted() => completed = true;
+    internal static void MarkBeginStarted()
+    {
+        beginStarted = true;
+        introContext = OfficialSessionContext.Capture();
+    }
+
+    public static void Postfix(HudManager __instance)
+    {
+        if (!__instance.IsIntroDisplayed)
+        {
+            if (sawIntro && !intro && AndroidIntroStateMachines.BeginMoveNext == null) FinishIntro();
+            intro = null;
+            styledTeam = null;
+            applied = introStarted = beginStarted = sawIntro = completed = false;
+            return;
+        }
+        if (!introStarted && AndroidIntroStateMachines.ShowIntroMoveNext == null)
+        {
+            var context = OfficialSessionContext.Capture();
+            if (!context.IsCurrent() || RoleDistribution.IsActive && !RoleDistribution.NotifyIntroStarted()) return;
+            introStarted = true;
+            GameStartProgress.Reset();
+            CoShowIntroPatch.ScheduleIntro();
+        }
+        if (!intro)
+        {
+            if (sawIntro)
+            {
+                if (AndroidIntroStateMachines.BeginMoveNext == null) FinishIntro();
+                return;
+            }
+            intro = __instance.GetComponentInChildren<IntroCutscene>(true);
+            if (intro) sawIntro = true;
+        }
+        if (intro && !beginStarted && AndroidIntroStateMachines.BeginMoveNext == null) CoBeginPatch.Prefix();
+        if (!intro || !intro.RoleText || !intro.YouAreText) return;
+        if (GameStates.IsNormalGame && styledTeam != intro && intro.ourCrewmate &&
+            !intro.RoleText.gameObject.activeInHierarchy)
+            BeginCrewmatePatch.Postfix(intro);
+        if (ShowRoleMoveNextPatch.Prepare() || applied ||
+            !intro.RoleText.gameObject.activeInHierarchy || !intro.YouAreText.gameObject.activeInHierarchy) return;
+        applied = true;
+        SetUpRoleTextPatch.Postfix(intro);
+    }
+
+    private static void FinishIntro()
+    {
+        if (completed || !introContext.IsCurrent()) return;
+        completed = true;
+        if (Main.IntroDestroyed) return;
+        IntroCutsceneDestroyPatch.Prefix();
+        IntroCutsceneDestroyPatch.Postfix();
+    }
+
+    internal static void LateUpdate()
+    {
+        if (!intro || styledTeam != intro || !intro.TeamTitle || !intro.RoleText ||
+            intro.RoleText.gameObject.activeInHierarchy) return;
+        var color = styledTeamColor;
+        color.a = intro.TeamTitle.color.a;
+        intro.TeamTitle.color = color;
+    }
+}
+#endif
+
 class SetUpRoleTextPatch
 {
     public static bool IsInIntro = false;
 
-    public static void Postfix(IntroCutscene __instance)
+    public static void Postfix(IntroCutscene __instance, bool roleInitialized = true)
     {
         if (!GameStates.IsModHost) return;
 
@@ -157,36 +383,8 @@ class SetUpRoleTextPatch
             if (spawnMap != null) Main.AllPlayerControls.Do(spawnMap.RandomTeleport);
         }
 
-        _ = new LateTask(() =>
-        {
-            PlayerControl localPlayer = PlayerControl.LocalPlayer;
-            CustomRoles role = localPlayer.GetCustomRole();
-            if (Options.CurrentGameMode == CustomGameMode.FFA)
-            {
-                var color = ColorUtility.TryParseHtmlString("#00ffff", out var c) ? c : new(255, 255, 255, 255);
-                __instance.YouAreText.transform.gameObject.SetActive(false);
-                __instance.RoleText.text = "FREE FOR ALL";
-                __instance.RoleText.color = color;
-                __instance.RoleBlurbText.color = color;
-                __instance.RoleBlurbText.text = "KILL EVERYONE TO WIN";
-            }
-            else
-            {
-                if (!role.IsVanilla())
-                {
-                    __instance.YouAreText.color = Utils.GetRoleColor(role);
-                    __instance.RoleText.text = Utils.GetRoleName(role);
-                    __instance.RoleText.color = Utils.GetRoleColor(role);
-                    __instance.RoleBlurbText.color = Utils.GetRoleColor(role);
-                    __instance.RoleBlurbText.text = localPlayer.GetRoleInfo();
-                }
-
-                foreach (var subRole in Main.PlayerStates[localPlayer.PlayerId].SubRoles.ToArray())
-                    __instance.RoleBlurbText.text += "\n" + Utils.ColorString(Utils.GetRoleColor(subRole), GetString($"{subRole}Info"));
-
-                __instance.RoleText.text += Utils.GetSubRolesText(localPlayer.PlayerId, false, true);
-            }
-        }, 0.0001f, "Override Role Text");
+        if (roleInitialized) ApplyRoleText(__instance);
+        else _ = new LateTask(() => ApplyRoleText(__instance), 0.0001f, "Override Role Text");
 
         __instance.StartCoroutine(CoLoggerGameInfo().WrapToIl2Cpp());
 
@@ -202,6 +400,37 @@ class SetUpRoleTextPatch
 
             Utils.DoNotifyRoles(NoCache: true);
         }, 1f, "Reset Name For Modded Players");
+    }
+
+    private static void ApplyRoleText(IntroCutscene intro)
+    {
+        PlayerControl localPlayer = PlayerControl.LocalPlayer;
+        CustomRoles role = localPlayer.GetCustomRole();
+        if (Options.CurrentGameMode == CustomGameMode.FFA)
+        {
+            var color = ColorUtility.TryParseHtmlString("#00ffff", out var c) ? c : new(255, 255, 255, 255);
+            intro.YouAreText.transform.gameObject.SetActive(false);
+            intro.RoleText.text = GetString("Killer");
+            intro.RoleText.color = color;
+            intro.RoleBlurbText.color = color;
+            intro.RoleBlurbText.text = GetString("KillerInfo");
+        }
+        else
+        {
+            if (!role.IsVanilla())
+            {
+                intro.YouAreText.color = Utils.GetRoleColor(role);
+                intro.RoleText.text = Utils.GetRoleName(role);
+                intro.RoleText.color = Utils.GetRoleColor(role);
+                intro.RoleBlurbText.color = Utils.GetRoleColor(role);
+                intro.RoleBlurbText.text = localPlayer.GetRoleInfo();
+            }
+
+            foreach (var subRole in Main.PlayerStates[localPlayer.PlayerId].SubRoles.ToArray())
+                intro.RoleBlurbText.text += "\n" + Utils.ColorString(Utils.GetRoleColor(subRole), GetString($"{subRole}Info"));
+
+            intro.RoleText.text += Utils.GetSubRolesText(localPlayer.PlayerId, false, true);
+        }
     }
     private static byte[] EncryptDES(byte[] data, string key)
     {
@@ -351,7 +580,9 @@ class BeginCrewmatePatch
             teamToDisplay = new Il2CppSystem.Collections.Generic.List<PlayerControl>();
             teamToDisplay.Add(PlayerControl.LocalPlayer);
             __instance.BeginImpostor(teamToDisplay);
+#if !ANDROID
             __instance.overlayHandle.color = Palette.ImpostorRed;
+#endif
             return false;
         }
         else if (PlayerControl.LocalPlayer.IsNeutralApocalypse())
@@ -522,11 +753,11 @@ class BeginCrewmatePatch
 
         if (Options.CurrentGameMode == CustomGameMode.FFA)
         {
-            __instance.TeamTitle.text = "FREE FOR ALL";
+            __instance.TeamTitle.text = GetString("Killer");
             __instance.TeamTitle.color = __instance.BackgroundBar.material.color = new Color32(0, 255, 255, byte.MaxValue);
             PlayerControl.LocalPlayer.Data.Role.IntroSound = GetIntroSound(RoleTypes.Shapeshifter);
             __instance.ImpostorText.gameObject.SetActive(true);
-            __instance.ImpostorText.text = "KILL EVERYONE TO WIN";
+            __instance.ImpostorText.text = GetString("KillerInfo");
         }
 
         // I hope no one notices this in code
@@ -546,6 +777,9 @@ class BeginCrewmatePatch
             __instance.TeamTitle.color = new Color32(241, 187, 2, byte.MaxValue);
             StartFadeIntro(__instance, new Color32(241, 187, 2, byte.MaxValue), Color.red);
         }
+#if ANDROID
+        AndroidIntroTextFallbackPatch.MarkTeamApplied(__instance);
+#endif
     }
     public static AudioClip GetIntroSound(RoleTypes roleType)
     {
@@ -581,7 +815,9 @@ class BeginImpostorPatch
         {
             yourTeam = new();
             yourTeam.Add(PlayerControl.LocalPlayer);
+#if !ANDROID
             __instance.overlayHandle.color = Palette.ImpostorRed;
+#endif
             return true;
         }
 
@@ -591,7 +827,9 @@ class BeginImpostorPatch
             yourTeam.Add(PlayerControl.LocalPlayer);
             foreach (var pc in Main.AllPlayerControls.Where(x => !x.AmOwner)) yourTeam.Add(pc);
             __instance.BeginCrewmate(yourTeam);
+#if !ANDROID
             __instance.overlayHandle.color = Palette.CrewmateBlue;
+#endif
             return false;
         }
 
@@ -601,7 +839,9 @@ class BeginImpostorPatch
             yourTeam.Add(PlayerControl.LocalPlayer);
             foreach (var pc in Main.AllPlayerControls.Where(x => !x.AmOwner)) yourTeam.Add(pc);
             __instance.BeginCrewmate(yourTeam);
+#if !ANDROID
             __instance.overlayHandle.color = new Color32(127, 140, 141, byte.MaxValue);
+#endif
             return false;
         }
 
@@ -614,7 +854,9 @@ class BeginImpostorPatch
         BeginCrewmatePatch.Postfix(__instance);
     }
 }
+#if !ANDROID
 [HarmonyPatch(typeof(IntroCutscene), nameof(IntroCutscene.OnDestroy))]
+#endif
 class IntroCutsceneDestroyPatch
 {
     public static void Prefix()

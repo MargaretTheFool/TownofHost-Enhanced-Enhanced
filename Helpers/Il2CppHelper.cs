@@ -4,6 +4,9 @@ namespace TOHE;
 
 public static class Il2CppHelper
 {
+    public static IEnumerable<T> FindObjectsOfTypeAll<T>() where T : UnityEngine.Object =>
+        UnityEngine.Resources.FindObjectsOfTypeAll(Il2CppInterop.Runtime.Il2CppType.Of<T>()).Select(value => value.Cast<T>());
+
     public static Il2CppSystem.Collections.Generic.List<T> ToIl2Cpp<T>(this List<T> sysList)
     {
         Il2CppSystem.Collections.Generic.List<T> list = new();

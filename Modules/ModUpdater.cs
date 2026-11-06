@@ -29,6 +29,10 @@ public class ModUpdater
 
     public static IEnumerator PrefixCoroutine()
     {
+#if ANDROID
+        // Starlight manages the installed mod and its updates.
+        yield break;
+#else
         NewVersionCheck();
         DeleteOldFiles();
         InfoPopup = UnityEngine.Object.Instantiate(Twitch.TwitchManager.Instance.TwitchPopup);
@@ -45,6 +49,7 @@ public class ModUpdater
             Logger.Info("latestVersionl: " + latestVersion, "CheckRelease");
             ResetUpdateButton();
         }
+#endif
     }
     public static void ResetUpdateButton()
     {

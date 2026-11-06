@@ -12,6 +12,9 @@ internal static class OfficialAnticheatLifecyclePatch
 {
     internal static void ResetOperations(bool preserveCapabilities = false)
     {
+#if ANDROID
+        StartGameHostPatch.isStartingAsHost = false;
+#endif
         GameStartProgress.Reset();
         AntiBlackout.Reset();
         RoleDistribution.Reset();
@@ -77,7 +80,28 @@ internal static class OfficialAnticheatLifecyclePatch
                     finished = true;
                     break;
                 }
-                yield return original.Current;
+                var current = original.Current;
+#if ANDROID
+                // Android ARM64 can inline CoStartGameHost into this iterator.
+                // Replace its yielded native iterator before Unity advances it.
+                var host = current?.TryCast<AmongUsClient._CoStartGameHost_d__28>();
+                var hostRoutine = host?.TryCast<Il2CppSystem.Collections.IEnumerator>();
+                if (hostRoutine != null)
+                {
+                    var client = host.__4__this;
+                    if (LobbyBehaviour.Instance != null) StartGameHostPatch.isStartingAsHost = true;
+                    try
+                    {
+                        if (!TOHE.StartGameHostPatch.CoStartGameHost_Prefix(client, ref hostRoutine))
+                            host.TryCast<Il2CppSystem.IDisposable>()?.Dispose();
+                        DleksPatch.Postfix(client, ref hostRoutine);
+                        yield return hostRoutine;
+                    }
+                    finally { StartGameHostPatch.isStartingAsHost = false; }
+                    continue;
+                }
+#endif
+                yield return current;
             }
         }
         finally

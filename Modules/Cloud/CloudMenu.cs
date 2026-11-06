@@ -58,7 +58,7 @@ internal static class CloudMenu
     internal static void Open(MainMenuManager menu)
     {
         if (panel != null || menu == null) return;
-        var options = UnityEngine.Resources.FindObjectsOfTypeAll<OptionsMenuBehaviour>()
+        var options = Il2CppHelper.FindObjectsOfTypeAll<OptionsMenuBehaviour>()
             .FirstOrDefault(x => x.gameObject.scene.name == "MainMenu");
         Open(options, menu.mainMenuUI.transform, true);
     }
@@ -149,9 +149,14 @@ internal static class CloudMenu
         roomShare = Button("CloudRoomShare", -1.3f, -0.58f, CloudService.ToggleRoomShare);
         tags = Button("CloudTagsUse", 1.3f, -0.58f, () => CloudService.SetTagsEnabled(!CloudService.TagsEnabled));
         tagsRefresh = Button("CloudTagsRefresh", -1.3f, -1.06f, CloudService.RefreshTags);
+#if ANDROID
+        lobbyButton = Button("CloudLobbyButtonVisible", 1.3f, -1.06f,
+            () => CloudService.SetLobbyButtonEnabled(!CloudService.LobbyButtonEnabled));
+#else
         systemProxy = Button("CloudProxyUse", 1.3f, -1.06f, () => CloudService.SetUseSystemProxy(!CloudService.UseSystemProxy));
         lobbyButton = Button("CloudLobbyButtonVisible", -1.3f, -1.54f,
             () => CloudService.SetLobbyButtonEnabled(!CloudService.LobbyButtonEnabled));
+#endif
         var back = Button("Back", 0f, -2.40f, Close);
 
         CloudService.RefreshAccount();
@@ -218,14 +223,18 @@ internal static class CloudMenu
         SetButton(roomShare, CloudService.CanChangeRoomShare);
         SetButton(tags, CloudService.CanChangeTags);
         SetButton(tagsRefresh, CloudService.TagsEnabled && CloudService.CanChangeTags);
+#if !ANDROID
         SetButton(systemProxy, CloudService.CanChangeProxy);
+#endif
         SetButton(lobbyButton, true);
         SetText(share.Text, Translator.GetString(CloudService.ShareEnabled ? "CloudShareOff" : "CloudShareOn"));
         SetText(roomShare.Text, Translator.GetString(CloudService.RoomIsShared ? "CloudRoomStop" : "CloudRoomShare"));
         SetText(tags.Text, Translator.GetString("CloudTagsUse") + ": " +
             Translator.GetString(CloudService.TagsEnabled ? "CloudOptionOn" : "CloudOptionOff"));
+#if !ANDROID
         SetText(systemProxy.Text, Translator.GetString("CloudProxyUse") + ": " +
             Translator.GetString(CloudService.UseSystemProxy ? "CloudOptionOn" : "CloudOptionOff"));
+#endif
         SetText(lobbyButton.Text, Translator.GetString("CloudLobbyButtonVisible") + ": " +
             Translator.GetString(CloudService.LobbyButtonEnabled ? "CloudOptionOn" : "CloudOptionOff"));
     }

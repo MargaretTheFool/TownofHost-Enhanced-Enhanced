@@ -7,11 +7,7 @@ namespace TOHE.Modules;
 // formatted tag, which may itself contain '=' in a color attribute.
 internal static class PrivateTagManager
 {
-#if ANDROID
-    private static string TagFile => Path.Combine(UnityEngine.Application.persistentDataPath, "TOHEE-DATA", "tags.txt");
-#else
-    private static string TagFile => Path.Combine("TOHEE-DATA", "tags.txt");
-#endif
+    private static string TagFile => Path.Combine(DataDirectoryMigration.DataDirectory, "tags.txt");
     private static Dictionary<string, string> tags = new(StringComparer.Ordinal);
 
     internal static void Reset() => tags = new(StringComparer.Ordinal);

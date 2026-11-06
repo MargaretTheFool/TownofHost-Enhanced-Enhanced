@@ -8,10 +8,14 @@
     <Description>Town Of Host Enhanced Enhanced</Description>
     <Authors>Moe; TOHEE contributors</Authors>
     <LangVersion>12.0</LangVersion>
-    <Configurations>Debug;Release;Canary</Configurations>
+    <Configurations>Debug;Release;Canary;Android</Configurations>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Optimize>true</Optimize>
     <CodePage>65001</CodePage>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Android'">
+    <DefineConstants>$(DefineConstants);ANDROID</DefineConstants>
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
     <!-- Translator reads language resources from the main assembly. -->
@@ -19,7 +23,7 @@
     <EmbeddedResource Update="Resources/Sounds/*.raw" LogicalName="TOHE.Resources.Sounds.%(Filename).raw" />
   </ItemGroup>
   <!-- Use the interop assemblies generated for the actual IL2CPP installation. -->
-  <ItemGroup Condition="'$(LocalAmongUsPath)' != ''">
+  <ItemGroup Condition="'$(LocalAmongUsPath)' != '' and '$(Configuration)' != 'Android'">
     <Reference Include="$(LocalAmongUsPath)/BepInEx/interop/*.dll" Private="false" />
     <Reference Include="$(LocalAmongUsPath)/BepInEx/core/0Harmony.dll" Private="false" />
     <Reference Include="$(LocalAmongUsPath)/BepInEx/core/BepInEx.Core.dll" Private="false" />
@@ -30,8 +34,9 @@
     <Reference Include="$(LocalAmongUsPath)/BepInEx/core/MonoMod.Utils.dll" Private="false" />
     <Reference Include="$(LocalAmongUsPath)/BepInEx/core/Mono.Cecil.dll" Private="false" />
   </ItemGroup>
-  <ItemGroup Condition="'$(LocalAmongUsPath)' == ''">
-    <PackageReference Include="AmongUs.GameLibs.Steam" Version="2026.9.29" PrivateAssets="all" />
+  <ItemGroup Condition="'$(LocalAmongUsPath)' == '' or '$(Configuration)' == 'Android'">
+    <PackageReference Include="AmongUs.GameLibs.Steam" Version="2026.9.29" PrivateAssets="all" Condition="'$(Configuration)' != 'Android'" />
+    <PackageReference Include="AmongUs.GameLibs.Android" Version="2026.9.29" PrivateAssets="all" Condition="'$(Configuration)' == 'Android'" />
     <PackageReference Include="BepInEx.IL2CPP.MSBuild" Version="2.1.0-rc.1" PrivateAssets="all" />
     <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.735" Private="false" ExcludeAssets="runtime;native" />
   </ItemGroup>
@@ -60,7 +65,7 @@
     </PropertyGroup>
     <WriteLinesToFile File="$(_GitIsDirtyFile)" Lines="$(GitIsDirty)" Overwrite="true" WriteOnlyWhenDifferent="true" />
   </Target>
-  <Target Name="ValidateLocalGame" BeforeTargets="ResolveReferences" Condition="'$(LocalAmongUsPath)' != ''">
+  <Target Name="ValidateLocalGame" BeforeTargets="ResolveReferences" Condition="'$(LocalAmongUsPath)' != '' and '$(Configuration)' != 'Android'">
     <Error Condition="!Exists('$(LocalAmongUsPath)/BepInEx/interop/Assembly-CSharp.dll')" Text="LocalAmongUsPath must point to an Among Us 2026.9.29 (19.0) installation with generated BepInEx interop assemblies." />
     <Error Condition="!Exists('$(LocalAmongUsPath)/BepInEx/core/BepInEx.Unity.IL2CPP.dll')" Text="BepInEx IL2CPP is missing from LocalAmongUsPath." />
   </Target>

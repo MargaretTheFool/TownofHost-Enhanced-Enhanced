@@ -20,7 +20,7 @@ namespace TOHE;
 [HarmonyPatch(typeof(ChatController), nameof(ChatController.SendChat))]
 internal class ChatCommands
 {
-    private static readonly string sponsorTagsFiles = @"./TOHEE-DATA/Tags/SPONSOR_TAGS";
+    private static string sponsorTagsFiles => Path.Combine(DataDirectoryMigration.DataDirectory, "Tags", "SPONSOR_TAGS");
 
     private static readonly Dictionary<char, int> Pollvotes = [];
     private static readonly Dictionary<char, string> PollQuestions = [];
@@ -692,7 +692,7 @@ internal class ChatCommands
                             Utils.SendMessage(GetString("TagColorInvalidHexCode"), PlayerControl.LocalPlayer.PlayerId);
                             break;
                         }
-                        string tagColorFilePath = $"{sponsorTagsFiles}/{PlayerControl.LocalPlayer.FriendCode}.txt";
+                        string tagColorFilePath = Path.Combine(sponsorTagsFiles, $"{PlayerControl.LocalPlayer.FriendCode}.txt");
                         if (!File.Exists(tagColorFilePath))
                         {
                             Logger.Msg($"File Not exist, creating file at {tagColorFilePath}", "tagcolor");
@@ -2143,7 +2143,7 @@ internal class ChatCommands
                         Utils.SendMessage(GetString("TagColorInvalidHexCode"), player.PlayerId);
                         break;
                     }
-                    string tagColorFilePath = $"{sponsorTagsFiles}/{player.FriendCode}.txt";
+                    string tagColorFilePath = Path.Combine(sponsorTagsFiles, $"{player.FriendCode}.txt");
                     if (!File.Exists(tagColorFilePath))
                     {
                         Logger.Msg($"File Not exist, creating file at {tagColorFilePath}", "tagcolor");

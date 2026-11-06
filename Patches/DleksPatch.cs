@@ -4,10 +4,12 @@ namespace TOHE.Patches;
 
 // ShouldFlipSkeld returns a constant in this build. Native callers can inline
 // that value, so load the selected HnS ship before the vanilla routine.
+#if !ANDROID
 [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.CoStartGameHost))]
+#endif
 public static class DleksPatch
 {
-    private static void Postfix(AmongUsClient __instance, ref Il2CppSystem.Collections.IEnumerator __result)
+    internal static void Postfix(AmongUsClient __instance, ref Il2CppSystem.Collections.IEnumerator __result)
     {
         if (!__instance.AmHost || !GameStates.IsModHost || !GameStates.IsHideNSeek ||
             GameStates.IsFreePlay || GameOptionsManager.Instance.CurrentGameOptions.MapId != 3) return;

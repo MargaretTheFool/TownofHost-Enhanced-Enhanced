@@ -31,7 +31,7 @@ internal static class CustomSoundMenu
         Close();
         if (inputTemplate == null)
         {
-            var template = UnityEngine.Resources.FindObjectsOfTypeAll<TextBoxTMP>()
+            var template = Il2CppHelper.FindObjectsOfTypeAll<TextBoxTMP>()
                 .FirstOrDefault(x => x.name == "EnterCodeField" && x.gameObject.scene.name == "MainMenu");
             if (template != null)
             {
@@ -95,7 +95,7 @@ internal static class CustomSoundMenu
 
     internal static void SyncMenuVisibility(bool menuVisible)
     {
-        var optionsOpen = UnityEngine.Resources.FindObjectsOfTypeAll<OptionsMenuBehaviour>()
+        var optionsOpen = Il2CppHelper.FindObjectsOfTypeAll<OptionsMenuBehaviour>()
             .Any(menu => menu.gameObject.scene.name == "MainMenu" && menu.gameObject.activeInHierarchy);
         SetMenuVisible(menuVisible && !optionsOpen);
     }
@@ -146,7 +146,7 @@ internal static class CustomSoundMenu
 
     private static void Open(MainMenuManager menu)
     {
-        var options = UnityEngine.Resources.FindObjectsOfTypeAll<OptionsMenuBehaviour>()
+        var options = Il2CppHelper.FindObjectsOfTypeAll<OptionsMenuBehaviour>()
             .FirstOrDefault(x => x.gameObject.scene.name == "MainMenu");
         if (options != null && options.gameObject.activeInHierarchy) return;
         var labelTemplate = options != null ? options.DisableMouseMovement.Text : menu.quitButton.GetComponentInChildren<TextMeshPro>(true);

@@ -5,6 +5,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using TOHE.Modules;
 
 namespace TOHE;
 
@@ -81,13 +82,13 @@ public static class Translator
         }
         //カスタム翻訳ファイルの読み込み
         builtInNames = translateMaps.ToDictionary(entry => entry.Key, entry => new Dictionary<int, string>(entry.Value));
-        if (!Directory.Exists(LANGUAGE_FOLDER_NAME)) Directory.CreateDirectory(LANGUAGE_FOLDER_NAME);
+        Directory.CreateDirectory(DataDirectoryMigration.LanguageDirectory);
 
         // 翻訳テンプレートの作成
         CreateTemplateFile();
         foreach (var lang in EnumHelper.GetAllValues<SupportedLangs>())
         {
-            if (File.Exists(@$"./{LANGUAGE_FOLDER_NAME}/{lang}.dat"))
+            if (File.Exists(Path.Combine(DataDirectoryMigration.LanguageDirectory, $"{lang}.dat")))
             {
                 if (!ActualRoleNames.ContainsKey(lang))
                     ActualRoleNames.Add(lang, []);
@@ -321,7 +322,7 @@ public static class Translator
     }
     static void UpdateCustomTranslation(string filename/*, SupportedLangs lang*/)
     {
-        string path = @$"./{LANGUAGE_FOLDER_NAME}/{filename}";
+        string path = Path.Combine(DataDirectoryMigration.LanguageDirectory, filename);
         if (File.Exists(path))
         {
             Logger.Info("Updating Custom Translations", "UpdateCustomTranslation");
@@ -365,7 +366,7 @@ public static class Translator
     }
     public static void LoadCustomTranslation(string filename, SupportedLangs lang)
     {
-        string path = @$"./{LANGUAGE_FOLDER_NAME}/{filename}";
+        string path = Path.Combine(DataDirectoryMigration.LanguageDirectory, filename);
         if (File.Exists(path))
         {
             Logger.Info($"加载自定义翻译文件：{filename}", "LoadCustomTranslation");
@@ -398,7 +399,7 @@ public static class Translator
     {
         var sb = new StringBuilder();
         foreach (var title in translateMaps) sb.Append($"{title.Key}:\n");
-        File.WriteAllText(@$"./{LANGUAGE_FOLDER_NAME}/template.dat", sb.ToString());
+        File.WriteAllText(Path.Combine(DataDirectoryMigration.LanguageDirectory, "template.dat"), sb.ToString());
     }
     public static void ExportCustomTranslation()
     {
@@ -410,6 +411,6 @@ public static class Translator
             if (!title.Value.TryGetValue((int)lang, out var text)) text = "";
             sb.Append($"{title.Key}:{text.Replace("\n", "\\n").Replace("\r", "\\r")}\n");
         }
-        File.WriteAllText(@$"./{LANGUAGE_FOLDER_NAME}/export_{lang}.dat", sb.ToString());
+        File.WriteAllText(Path.Combine(DataDirectoryMigration.LanguageDirectory, $"export_{lang}.dat"), sb.ToString());
     }
 }

@@ -238,7 +238,9 @@ internal class ChangeRoleSettings
         }
     }
 }
+#if !ANDROID
 [HarmonyPatch]
+#endif
 internal class StartGameHostPatch
 {
     private static RoleOptionsCollectionV12 RoleOpt => Main.NormalOptions.roleOptions;
@@ -258,8 +260,10 @@ internal class StartGameHostPatch
         };
     }
 
+#if !ANDROID
     [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.CoStartGameHost))]
     [HarmonyPrefix]
+#endif
     public static bool CoStartGameHost_Prefix(AmongUsClient __instance, ref Il2CppSystem.Collections.IEnumerator __result)
     {
         if (!__instance.AmHost || !GameStates.IsModHost || !GameStates.IsNormalGame || GameStates.IsFreePlay)

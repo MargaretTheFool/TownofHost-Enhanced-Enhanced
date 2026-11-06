@@ -186,7 +186,7 @@ public static class MainMenuManagerPatch
                 new(-1.8f, -1.1f, 1f),
                 new(153, 153, 153, byte.MaxValue),
                 new(209, 209, 209, byte.MaxValue),
-                (UnityEngine.Events.UnityAction)(() => Application.OpenURL(Main.GitHubInviteUrl)),
+                (UnityEngine.Events.UnityAction)(() => Constants.OpenURL(Main.GitHubInviteUrl)),
                 GetString("GitHub")); //"GitHub"
         }
         gitHubButton.gameObject.SetActive(Main.ShowGitHubButton);
@@ -199,7 +199,7 @@ public static class MainMenuManagerPatch
                 new(-1.8f, -1.5f, 1f),
                 new(88, 101, 242, byte.MaxValue),
                 new(148, 161, byte.MaxValue, byte.MaxValue),
-                (UnityEngine.Events.UnityAction)(() => Application.OpenURL(Main.DiscordInviteUrl)),
+                (UnityEngine.Events.UnityAction)(() => Constants.OpenURL(Main.DiscordInviteUrl)),
                 GetString("Discord"));
         }
         discordButton.gameObject.SetActive(Main.ShowDiscordButton);
@@ -212,7 +212,7 @@ public static class MainMenuManagerPatch
                 new(-1.8f, -1.9f, 1f),
                 new(58, 166, 117, byte.MaxValue),
                 new(118, 216, 167, byte.MaxValue),
-                (UnityEngine.Events.UnityAction)(() => Application.OpenURL(Main.WebsiteUrl)),
+                (UnityEngine.Events.UnityAction)(() => Constants.OpenURL(Main.WebsiteUrl)),
                 GetString("Website"));
         }
         websiteButton.gameObject.SetActive(Main.ShowWebsiteButton);

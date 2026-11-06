@@ -20,7 +20,7 @@ public class DevUser(string code = "", string color = "null", string userType = 
     public string GetTag() => GetTag(true);
     public string GetTag(bool useLocalColor)
     {
-        string tagColorFilePath = @$"./TOHEE-DATA/Tags/SPONSOR_TAGS/{Code}.txt";
+        string tagColorFilePath = Path.Combine(TOHE.Modules.DataDirectoryMigration.DataDirectory, "Tags", "SPONSOR_TAGS", $"{Code}.txt");
 
         if (Color == "null" || Color == string.Empty) return $"<size=1.2>{Tag}</size>\r\n";
         var startColor = Color.TrimStart('#');

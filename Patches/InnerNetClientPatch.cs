@@ -153,7 +153,9 @@ internal class GameDataHandlerPatch
     }
 }
 
+#if !ANDROID
 [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.CoStartGameHost))]
+#endif
 internal class StartGameHostPatch
 {
     public static bool isStartingAsHost = false;

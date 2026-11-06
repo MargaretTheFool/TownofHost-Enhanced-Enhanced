@@ -462,5 +462,8 @@ class ModManagerLateUpdatePatch
             __instance.localCamera, AspectPosition.EdgeAlignments.RightTop,
             new Vector3(0.4f, offset_y, __instance.localCamera.nearClipPlane + 0.1f));
         GameStartProgress.Update();
+#if ANDROID
+        AndroidIntroTextFallbackPatch.LateUpdate();
+#endif
     }
 }

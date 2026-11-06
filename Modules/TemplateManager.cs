@@ -5,13 +5,14 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using TOHE.Modules;
 using static TOHE.Translator;
 
 namespace TOHE;
 
 public static class TemplateManager
 {
-    private static readonly string TEMPLATE_FILE_PATH = "./TOHEE-DATA/template.txt";
+    private static string TEMPLATE_FILE_PATH => Path.Combine(DataDirectoryMigration.DataDirectory, "template.txt");
     private static readonly Dictionary<string, Func<string>> _replaceDictionaryNormalOptions = new()
     {
         ["RoomCode"] = () => InnerNet.GameCode.IntToGameName(AmongUsClient.Instance.GameId),
@@ -106,9 +107,9 @@ public static class TemplateManager
                     _ => "English"
                 };
             else fileName = "English";
-            if (!Directory.Exists(@"TOHEE-DATA")) Directory.CreateDirectory(@"TOHEE-DATA");
+            Directory.CreateDirectory(DataDirectoryMigration.DataDirectory);
             var defaultTemplateMsg = GetResourcesTxt($"TOHE.Resources.Config.template.{fileName}.txt");
-            const string defaultTemplatePath = @"./TOHEE-DATA/Default_Teamplate.txt";
+            string defaultTemplatePath = Path.Combine(DataDirectoryMigration.DataDirectory, "Default_Teamplate.txt");
             var defaultTemplateExists = File.Exists(defaultTemplatePath);
             if (!defaultTemplateExists)
                 Logger.Warn("Creating Default_Template.txt", "TemplateManager");
@@ -116,7 +117,8 @@ public static class TemplateManager
                 File.WriteAllText(defaultTemplatePath, defaultTemplateMsg);
             if (!File.Exists(TEMPLATE_FILE_PATH))
             {
-                if (File.Exists(@"./template.txt")) File.Copy(@"./template.txt", TEMPLATE_FILE_PATH);
+                string legacyTemplatePath = Path.Combine(DataDirectoryMigration.RootDirectory, "template.txt");
+                if (File.Exists(legacyTemplatePath)) File.Copy(legacyTemplatePath, TEMPLATE_FILE_PATH);
                 else
                 {
                     Logger.Warn($"Creating a new Template file from: {fileName}", "TemplateManager");

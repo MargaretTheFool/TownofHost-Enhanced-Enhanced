@@ -140,12 +140,17 @@ public static class OptionShower
         if (renderedPage != currentPage)
         {
             renderedPage = currentPage;
-            renderedText = $"{pages[currentPage]}\n\n{GetString("PressTabToNextPage")} ({currentPage + 1}/{pages.Count})";
+            string footer = Application.platform == RuntimePlatform.Android
+                ? $"({currentPage + 1}/{pages.Count})"
+                : $"{GetString("PressTabToNextPage")} ({currentPage + 1}/{pages.Count})";
+            renderedText = $"{pages[currentPage]}\n\n{footer}";
         }
         return renderedText;
     }
 
     public static void Next() => SelectPage((currentPage + 1) % Math.Max(1, pages.Count));
+
+    public static void Previous() => SelectPage((currentPage + Math.Max(1, pages.Count) - 1) % Math.Max(1, pages.Count));
 
     public static void SelectPage(int page)
     {

@@ -151,7 +151,7 @@ public class GameSettingMenuPatch
 
         // The sidebar label is outside the settings scroller's stencil mask.
         var valueTemplate = __instance.GamePresetsButton.GetComponentInChildren<TextMeshPro>(true);
-        var readableFont = Resources.FindObjectsOfTypeAll<TMP_FontAsset>()
+        var readableFont = Il2CppHelper.FindObjectsOfTypeAll<TMP_FontAsset>()
             .FirstOrDefault(font => font.name == "Barlow-SemiBold SDF") ?? valueTemplate.font;
         var presetBackground = CreatePresetSelector(__instance, valueTemplate, readableFont);
 

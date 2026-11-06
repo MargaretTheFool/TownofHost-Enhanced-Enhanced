@@ -5,15 +5,16 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using TOHE.Modules;
 using static TOHE.Translator;
 
 namespace TOHE;
 
 public static class BanManager
 {
-    private const string DenyNameListPath = "./TOHEE-DATA/DenyName.txt";
-    private const string BanListPath = "./TOHEE-DATA/BanList.txt";
-    private const string WhiteListListPath = "./TOHEE-DATA/WhiteList.txt";
+    private static string DenyNameListPath => Path.Combine(DataDirectoryMigration.DataDirectory, "DenyName.txt");
+    private static string BanListPath => Path.Combine(DataDirectoryMigration.DataDirectory, "BanList.txt");
+    private static string WhiteListListPath => Path.Combine(DataDirectoryMigration.DataDirectory, "WhiteList.txt");
     // Full PUIDs stay banned for this room even if the client reconnects from another IP.
     private static readonly HashSet<string> SessionBannedPuids = new(StringComparer.Ordinal);
     private static readonly object SessionBanLock = new();
@@ -43,7 +44,7 @@ public static class BanManager
     {
         try
         {
-            Directory.CreateDirectory("TOHEE-DATA");
+            Directory.CreateDirectory(DataDirectoryMigration.DataDirectory);
 
             if (!File.Exists(BanListPath))
             {
@@ -121,7 +122,7 @@ public static class BanManager
 
         try
         {
-            Directory.CreateDirectory("TOHEE-DATA");
+            Directory.CreateDirectory(DataDirectoryMigration.DataDirectory);
             if (!File.Exists(DenyNameListPath)) File.Create(DenyNameListPath).Close();
             using StreamReader sr = new(DenyNameListPath);
             string line;
@@ -204,7 +205,7 @@ public static class BanManager
 
         try
         {
-            Directory.CreateDirectory("TOHEE-DATA");
+            Directory.CreateDirectory(DataDirectoryMigration.DataDirectory);
             if (!File.Exists(BanListPath)) File.Create(BanListPath).Close();
             using StreamReader sr = new(BanListPath);
             string line;

@@ -35,7 +35,9 @@ namespace TOHE;
 [BepInIncompatibility("com.bhr.bedderhostroles")]
 [BepInIncompatibility("dev.allofus.overloaded")]
 [BepInIncompatibility("xyz.crowdedmods.crowdedmod")]
+#if !ANDROID
 [BepInProcess("Among Us.exe")]
+#endif
 public class Main : BasePlugin
 {
     // == Program Config ==
@@ -138,8 +140,6 @@ public class Main : BasePlugin
     public static readonly Dictionary<byte, Color32> PlayerColors = [];
     public static readonly Dictionary<byte, PlayerState.DeathReason> AfterMeetingDeathPlayers = [];
     public static readonly Dictionary<CustomRoles, string> roleColors = [];
-    const string LANGUAGE_FOLDER_NAME = "Language";
-
     public static bool IsFixedCooldown => CustomRoles.Vampire.IsEnable() || CustomRoles.Poisoner.IsEnable();
     public static float RefixCooldownDelay = 0f;
     public static NetworkedPlayerInfo LastVotedPlayerInfo;
@@ -254,12 +254,12 @@ public class Main : BasePlugin
     {
         var sb = new StringBuilder();
         foreach (var title in roleColors) sb.Append($"{title.Key}:\n");
-        File.WriteAllText(@$"./{LANGUAGE_FOLDER_NAME}/templateRoleColor.dat", sb.ToString());
+        File.WriteAllText(Path.Combine(DataDirectoryMigration.LanguageDirectory, "templateRoleColor.dat"), sb.ToString());
     }
     public static void LoadCustomRoleColor()
     {
         const string filename = "RoleColor.dat";
-        string path = @$"./{LANGUAGE_FOLDER_NAME}/{filename}";
+        string path = Path.Combine(DataDirectoryMigration.LanguageDirectory, filename);
         if (File.Exists(path))
         {
             TOHE.Logger.Info($"Load custom Role Color file：{filename}", "LoadCustomRoleColor");
@@ -365,9 +365,9 @@ public class Main : BasePlugin
                         break;
                 }
             }
-            if (!Directory.Exists(LANGUAGE_FOLDER_NAME)) Directory.CreateDirectory(LANGUAGE_FOLDER_NAME);
+            if (!Directory.Exists(DataDirectoryMigration.LanguageDirectory)) Directory.CreateDirectory(DataDirectoryMigration.LanguageDirectory);
             CreateTemplateRoleColorFile();
-            if (File.Exists(@$"./{LANGUAGE_FOLDER_NAME}/RoleColor.dat"))
+            if (File.Exists(Path.Combine(DataDirectoryMigration.LanguageDirectory, "RoleColor.dat")))
             {
                 UpdateCustomTranslation();
                 LoadCustomRoleColor();
@@ -438,7 +438,7 @@ public class Main : BasePlugin
     }
     static void UpdateCustomTranslation()
     {
-        string path = @$"./{LANGUAGE_FOLDER_NAME}/RoleColor.dat";
+        string path = Path.Combine(DataDirectoryMigration.LanguageDirectory, "RoleColor.dat");
         if (File.Exists(path))
         {
             TOHE.Logger.Info("Updating Custom Role Colors", "UpdateRoleColors");
@@ -487,7 +487,7 @@ public class Main : BasePlugin
         {
             sb.Append($"{kvp.Key.ToString()}:{kvp.Value}\n");
         }
-        File.WriteAllText(@$"./{LANGUAGE_FOLDER_NAME}/export_RoleColor.dat", sb.ToString());
+        File.WriteAllText(Path.Combine(DataDirectoryMigration.LanguageDirectory, "export_RoleColor.dat"), sb.ToString());
     }
 
     public override bool Unload()
@@ -543,9 +543,10 @@ public class Main : BasePlugin
         Logger.LogInfo($"AU MCI GUID: {ModRegistration.Register(PluginVersion)}");
         coroutines = AddComponent<Coroutines>();
         TOHE.Logger.Enable();
-        DataDirectoryMigration.Initialize(Environment.CurrentDirectory);
 #if ANDROID
         DataDirectoryMigration.Initialize(Application.persistentDataPath);
+#else
+        DataDirectoryMigration.Initialize(Environment.CurrentDirectory);
 #endif
         //TOHE.Logger.Disable("NotifyRoles");
         TOHE.Logger.Disable("SwitchSystem");

@@ -7,9 +7,9 @@ namespace TOHE.Modules;
 // https://github.com/tukasa0001/TownOfHost/blob/main/Modules/OptionSaver.cs
 public static class OptionSaver
 {
-    private static readonly DirectoryInfo SaveDataDirectoryInfo = new("./TOHEE-DATA/SaveData/");
-    private static readonly string LegacyPath = Path.Combine(SaveDataDirectoryInfo.FullName, "Options.json");
-    private static readonly string GlobalPath = Path.Combine(SaveDataDirectoryInfo.FullName, "GlobalOptions.jsonc");
+    private static string SaveDataDirectory => Path.Combine(DataDirectoryMigration.DataDirectory, "SaveData");
+    private static string LegacyPath => Path.Combine(SaveDataDirectory, "Options.json");
+    private static string GlobalPath => Path.Combine(SaveDataDirectory, "GlobalOptions.jsonc");
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         ReadCommentHandling = JsonCommentHandling.Skip,
@@ -23,11 +23,11 @@ public static class OptionSaver
     private static bool loading;
     private static bool loadFailed = true;
 
-    private static string PresetPath(int preset) => Path.Combine(SaveDataDirectoryInfo.FullName, $"Preset{preset + 1}.jsonc");
+    private static string PresetPath(int preset) => Path.Combine(SaveDataDirectory, $"Preset{preset + 1}.jsonc");
 
     public static void Initialize()
     {
-        if (!SaveDataDirectoryInfo.Exists) SaveDataDirectoryInfo.Create();
+        Directory.CreateDirectory(SaveDataDirectory);
     }
 
     /// <summary>Save current options to the files whose values have changed.</summary>
@@ -79,7 +79,7 @@ public static class OptionSaver
             string header = isPreset
                 ? "// Option IDs map to stored indexes, not displayed values.\n// Copy over any preset file and select that preset to load it.\n"
                 : "// Global option IDs map to stored indexes, including the local preset selector.\n";
-            Directory.CreateDirectory(SaveDataDirectoryInfo.FullName);
+            Directory.CreateDirectory(SaveDataDirectory);
             File.WriteAllText(temporaryPath, header + JsonSerializer.Serialize(data, JsonOptions));
             File.Move(temporaryPath, path, overwrite: true);
             return true;

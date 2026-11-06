@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
+using TOHE.Modules;
 
 namespace TOHE.Roles.Core.AssignManager;
 
@@ -46,7 +47,7 @@ public static class RoundAssignment
         // Local replay evidence contains IDs/options/results only, never account identifiers.
         try
         {
-            string directory = Path.Combine("TOHEE-DATA", "Assignments");
+            string directory = Path.Combine(DataDirectoryMigration.DataDirectory, "Assignments");
             Directory.CreateDirectory(directory);
             var record = new
             {
