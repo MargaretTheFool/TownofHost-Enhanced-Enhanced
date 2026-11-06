@@ -8,14 +8,22 @@
     <Description>Town Of Host Enhanced Enhanced</Description>
     <Authors>AmongLLM; TOHEE contributors</Authors>
     <LangVersion>12.0</LangVersion>
-    <Configurations>Debug;Release;Canary;Android</Configurations>
+    <Configurations>Debug;Release;AndroidDebug;AndroidRelease</Configurations>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Optimize>true</Optimize>
     <CodePage>65001</CodePage>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)' == 'Android'">
+  <PropertyGroup Condition="'$(Configuration)' == 'AndroidDebug' or '$(Configuration)' == 'AndroidRelease'">
+    <TOHEAndroidBuild>true</TOHEAndroidBuild>
     <DefineConstants>$(DefineConstants);ANDROID</DefineConstants>
     <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'AndroidDebug'">
+    <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'AndroidRelease'">
+    <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <!-- Translator reads language resources from the main assembly. -->
@@ -23,7 +31,7 @@
     <EmbeddedResource Update="Resources/Sounds/*.raw" LogicalName="TOHE.Resources.Sounds.%(Filename).raw" />
   </ItemGroup>
   <!-- Use the interop assemblies generated for the actual IL2CPP installation. -->
-  <ItemGroup Condition="'$(LocalAmongUsPath)' != '' and '$(Configuration)' != 'Android'">
+  <ItemGroup Condition="'$(LocalAmongUsPath)' != '' and '$(TOHEAndroidBuild)' != 'true'">
     <Reference Include="$(LocalAmongUsPath)/BepInEx/interop/*.dll" Private="false" />
     <Reference Include="$(LocalAmongUsPath)/BepInEx/core/0Harmony.dll" Private="false" />
     <Reference Include="$(LocalAmongUsPath)/BepInEx/core/BepInEx.Core.dll" Private="false" />
@@ -34,15 +42,19 @@
     <Reference Include="$(LocalAmongUsPath)/BepInEx/core/MonoMod.Utils.dll" Private="false" />
     <Reference Include="$(LocalAmongUsPath)/BepInEx/core/Mono.Cecil.dll" Private="false" />
   </ItemGroup>
-  <ItemGroup Condition="'$(LocalAmongUsPath)' == '' or '$(Configuration)' == 'Android'">
-    <PackageReference Include="AmongUs.GameLibs.Steam" Version="2026.9.29" PrivateAssets="all" Condition="'$(Configuration)' != 'Android'" />
-    <PackageReference Include="AmongUs.GameLibs.Android" Version="2026.9.29" PrivateAssets="all" Condition="'$(Configuration)' == 'Android'" />
+  <ItemGroup Condition="'$(LocalAmongUsPath)' == '' or '$(TOHEAndroidBuild)' == 'true'">
+    <PackageReference Include="AmongUs.GameLibs.Steam" Version="2026.9.29" PrivateAssets="all" Condition="'$(TOHEAndroidBuild)' != 'true'" />
+    <PackageReference Include="AmongUs.GameLibs.Android" Version="2026.9.29" PrivateAssets="all" Condition="'$(TOHEAndroidBuild)' == 'true'" />
     <PackageReference Include="BepInEx.IL2CPP.MSBuild" Version="2.1.0-rc.1" PrivateAssets="all" />
     <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.735" Private="false" ExcludeAssets="runtime;native" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="GitInfo" Version="3.3.3" PrivateAssets="all" />
   </ItemGroup>
+  <Target Name="ValidateConfiguration" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(Configuration)' != 'Debug' and '$(Configuration)' != 'Release' and '$(Configuration)' != 'AndroidDebug' and '$(Configuration)' != 'AndroidRelease'"
+           Text="Unsupported configuration '$(Configuration)'. Use Debug, Release, AndroidDebug, or AndroidRelease." />
+  </Target>
   <!-- GitInfo 3.3.3's diff check omits untracked files. Replace it after the
        Git root is known and before GitInfo consumes its dirty cache/input. -->
   <Target Name="TOHE_CheckGitStatus" AfterTargets="_GitRoot">
@@ -65,7 +77,7 @@
     </PropertyGroup>
     <WriteLinesToFile File="$(_GitIsDirtyFile)" Lines="$(GitIsDirty)" Overwrite="true" WriteOnlyWhenDifferent="true" />
   </Target>
-  <Target Name="ValidateLocalGame" BeforeTargets="ResolveReferences" Condition="'$(LocalAmongUsPath)' != '' and '$(Configuration)' != 'Android'">
+  <Target Name="ValidateLocalGame" BeforeTargets="ResolveReferences" Condition="'$(LocalAmongUsPath)' != '' and '$(TOHEAndroidBuild)' != 'true'">
     <Error Condition="!Exists('$(LocalAmongUsPath)/BepInEx/interop/Assembly-CSharp.dll')" Text="LocalAmongUsPath must point to an Among Us 2026.9.29 (19.0) installation with generated BepInEx interop assemblies." />
     <Error Condition="!Exists('$(LocalAmongUsPath)/BepInEx/core/BepInEx.Unity.IL2CPP.dll')" Text="BepInEx IL2CPP is missing from LocalAmongUsPath." />
   </Target>
