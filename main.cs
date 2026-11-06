@@ -543,11 +543,7 @@ public class Main : BasePlugin
         Logger.LogInfo($"AU MCI GUID: {ModRegistration.Register(PluginVersion)}");
         coroutines = AddComponent<Coroutines>();
         TOHE.Logger.Enable();
-#if ANDROID
-        DataDirectoryMigration.Initialize(Application.persistentDataPath);
-#else
-        DataDirectoryMigration.Initialize(Environment.CurrentDirectory);
-#endif
+        DataDirectoryMigration.Initialize();
         //TOHE.Logger.Disable("NotifyRoles");
         TOHE.Logger.Disable("SwitchSystem");
         TOHE.Logger.Disable("ModNews");

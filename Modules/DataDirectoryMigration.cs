@@ -11,9 +11,9 @@ internal static class DataDirectoryMigration
     internal static string DataDirectory => Path.Combine(RootDirectory, "TOHEE-DATA");
     internal static string LanguageDirectory => Path.Combine(RootDirectory, "Language");
 
-    internal static void Initialize(string root)
+    internal static void Initialize()
     {
-        rootDirectory = Path.GetFullPath(root);
+        rootDirectory = Path.GetFullPath(GetDefaultRoot());
         string oldDirectory = Path.Combine(rootDirectory, "TOHE-DATA");
         string newDirectory = DataDirectory;
         string oldSaveData = Path.Combine(oldDirectory, "SaveData");
@@ -47,7 +47,8 @@ internal static class DataDirectoryMigration
     private static string GetDefaultRoot()
     {
 #if ANDROID
-        return UnityEngine.Application.persistentDataPath;
+        return Environment.GetEnvironmentVariable("STAR_DATA_PATH")
+            ?? throw new InvalidOperationException("STAR_DATA_PATH is required for Starlight data storage.");
 #else
         return Environment.CurrentDirectory;
 #endif

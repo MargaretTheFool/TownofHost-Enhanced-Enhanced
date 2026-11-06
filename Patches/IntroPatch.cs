@@ -223,11 +223,13 @@ internal static class AndroidIntroCompletionPatch
         if ((int)state.GetValue(__instance) == 0) CoBeginPatch.Prefix();
     }
 
-    public static void Postfix(bool __result)
+    public static void Postfix(Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase __instance, bool __result)
     {
-        if (__result || !GameStates.IsInGame) return;
+        // Project Lotus and TownOfHostNU use CoBegin state -1 for intro cleanup.
+        if (__result || (int)state.GetValue(__instance) != -1 || !GameStates.IsInGame || Main.IntroDestroyed) return;
         IntroCutsceneDestroyPatch.Prefix();
         IntroCutsceneDestroyPatch.Postfix();
+        AndroidIntroTextFallbackPatch.MarkIntroCompleted();
     }
 }
 #endif
