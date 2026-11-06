@@ -6,7 +6,7 @@
     <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
     <Description>Town Of Host Enhanced Enhanced</Description>
-    <Authors>Moe; TOHEE contributors</Authors>
+    <Authors>AmongLLM; TOHEE contributors</Authors>
     <LangVersion>12.0</LangVersion>
     <Configurations>Debug;Release;Canary;Android</Configurations>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
