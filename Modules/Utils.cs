@@ -1616,6 +1616,10 @@ public static class Utils
         Color32 color32 = (Color32)color;
         return $"{color32.r:X2}{color32.g:X2}{color32.b:X2}{color32.a:X2}";
     }
+    public static string GetColoredTextByRole(this CustomRoles role, string text)
+    {
+        return ColorString(GetRoleColor(role), text);
+    }
     public static void ApplySuffix(PlayerControl player)
     {
         // Only host
