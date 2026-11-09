@@ -657,6 +657,14 @@ class CastVotePatch
             }
 
 
+            if (!MeetingAbilities.UsesJudgeButton(voter) && !voter.GetRoleClass().HasVoted &&
+                voter.GetRoleClass() is Socialite socialite && socialite.IsGuest(target.PlayerId))
+            {
+                socialite.CheckVote(voter, target);
+                __instance.RpcClearVoteDelay(voter.GetClientId());
+                return false;
+            }
+
             if (!MeetingAbilities.UsesJudgeButton(voter) && !voter.GetRoleClass().HasVoted && voter.GetRoleClass().CheckVote(voter, target) == false)
             {
                 Logger.Info($"Canceling {voter.GetRealName()}'s vote because of {voter.GetCustomRole()}", "CastVotePatch.RoleBase.CheckVote");
