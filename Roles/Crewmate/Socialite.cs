@@ -2,6 +2,7 @@ using Hazel;
 using InnerNet;
 using TOHE.Modules;
 using TOHE.Roles.Core;
+using UnityEngine;
 using static TOHE.Options;
 using static TOHE.Translator;
 using static TOHE.Utils;
@@ -11,7 +12,7 @@ internal class Socialite : RoleBase
 {
     //===========================SETUP================================\\
     private const int Id = 31800;
-    public static bool HasEnabled = CustomRoleManager.HasEnabled(CustomRoles.Socialite);
+    public static bool HasEnabled => CustomRoleManager.HasEnabled(CustomRoles.Socialite);
     public override bool IsDesyncRole => true;
     public override CustomRoles ThisRoleBase => CustomRoles.Impostor;
     public override Custom_RoleType ThisRoleType => Custom_RoleType.CrewmateSupport;
@@ -45,41 +46,61 @@ internal class Socialite : RoleBase
         AbilityLimit = AbilityLimitOpt.GetInt();
     }
 
-    public override void SetKillCooldown(byte id) => Main.AllPlayerKillCooldown[id] = AbilityCooldown.GetFloat();
-    public override bool CanUseKillButton(PlayerControl pc) => true;
+    public override void SetKillCooldown(byte id) => Main.AllPlayerKillCooldown[id] = AbilityLimit > 0 ? AbilityCooldown.GetFloat() : 300f;
+    public override bool CanUseKillButton(PlayerControl pc) => AbilityLimit > 0;
+    public override string GetProgressText(byte playerId, bool comms) => ColorString(AbilityLimit > 0 ? GetRoleColor(CustomRoles.Socialite) : Color.gray, $"({AbilityLimit})");
     public override string GetMark(PlayerControl seer, PlayerControl seen, bool isForMeeting = false) => PartiedPlayers.Contains(seen.PlayerId) ? CustomRoles.Socialite.GetColoredTextByRole("♪") : string.Empty;
-    public void SendRPC(PlayerControl player, PlayerControl target)
+    internal bool IsGuest(byte playerId) => GuestList.Contains(playerId);
+    internal static bool BlocksInteraction(PlayerControl actor, PlayerControl target, string action) =>
+        CustomRoleManager.AllEnabledRoles.OfType<Socialite>().Any(role => role.CheckInteraction(actor, target, action));
+
+    private void SendRPC()
     {
         MessageWriter writer = CustomRpcTransport.Start(CustomRPC.SyncRoleSkill, SendOption.Reliable);
         writer.WriteNetObject(_Player);
-        writer.Write(player.PlayerId);
-        writer.Write(target.PlayerId);
+        writer.Write(AbilityLimit);
+        writer.Write(PartiedPlayers.Count);
+        foreach (byte playerId in PartiedPlayers)
+            writer.Write(playerId);
         CustomRpcTransport.Finish(writer);
     }
-    public override void ReceiveRPC(MessageReader reader, PlayerControl NaN)
+    public override void ReceiveRPC(MessageReader reader, PlayerControl pc)
     {
-        byte playerId = reader.ReadByte();
-
-        PartiedPlayers.Add(reader.ReadByte());
+        AbilityLimit = reader.ReadSingle();
+        int count = reader.ReadInt32();
+        PartiedPlayers.Clear();
+        for (int i = 0; i < count; i++)
+            PartiedPlayers.Add(reader.ReadByte());
     }
     public override bool ForcedCheckMurderAsKiller(PlayerControl killer, PlayerControl target)
     {
-        if (killer == null || target == null) return false;
-        if (PartiedPlayers.Contains(target.PlayerId)) return false;
+        string reason = killer == null || target == null ? "player missing" :
+            AbilityLimit < 1 ? "no uses remaining" :
+            PartiedPlayers.Contains(target.PlayerId) ? "target already partying" : null;
+        if (reason != null)
+        {
+            Logger.Info($"Party ability canceled: actor={killer?.GetRealName()} ({killer?.PlayerId}), target={target?.GetRealName()} ({target?.PlayerId}), reason={reason}", "Socialite");
+            return false;
+        }
         PartiedPlayers.Add(target.PlayerId);
-        SendRPC(killer, target);
-        killer.Notify(string.Format(GetString(("SocialitePartyMsg")), target.GetRealName()));
+        killer.SetKillCooldown(AbilityLimit == 1 ? 300f : -1f);
         AbilityLimit--;
-        killer.SetKillCooldown();
+        SendRPC();
+        killer.Notify(string.Format(GetString("SocialitePartyMsg"), target.GetRealName()));
         killer.ResetKillCooldown();
+        Logger.Info($"Party ability used; murder canceled: actor={killer.GetRealName()} ({killer.PlayerId}), target={target.GetRealName()} ({target.PlayerId}), uses remaining={AbilityLimit}", "Socialite");
         return false;
     }
-    public override bool CheckMurderOnOthersTarget(PlayerControl killer, PlayerControl target)
+    public override bool CheckMurderOnOthersTarget(PlayerControl killer, PlayerControl target) =>
+        CheckInteraction(killer, target, "RpcCheckAndMurder");
+
+    private bool CheckInteraction(PlayerControl killer, PlayerControl target, string action)
     {
         if (killer == null || target == null) return false;
         if (GuestList.Contains(killer.PlayerId)) return false;
         if (PartiedPlayers.Contains(target.PlayerId))
         {
+            Logger.Info($"{action} canceled: actor={killer.GetRealName()} ({killer.PlayerId}, {killer.GetCustomRole()}), target={target.GetRealName()} ({target.PlayerId}), Socialite={_Player?.GetRealName()} ({_Player?.PlayerId}); target is partying and actor is not a guest", "Socialite");
             killer.Notify(GetString("SocialiteBlockNotification"));
             PreGuestList.Add(killer.PlayerId);
             return true;
@@ -96,7 +117,7 @@ internal class Socialite : RoleBase
     public override void OnMeetingHudStart(PlayerControl pc)
     {
         string message = GetString("SocialiteGuestListMsg");
-        bool showIds = PlayerIdAudience.GetInt() != 0 && PlayerIdPeriod.GetInt() != 0;
+        bool showIds = PlayerIdentifiers.Shows(pc.IsModded(), meeting: true);
         foreach (var playerId in GuestList)
         {
             message += (showIds ? $"[{playerId}] " : "") + (PreGuestList.Contains(playerId) ? $"<i>{GetPlayerById(playerId).GetRealName()}</i>\n" : $"{GetPlayerById(playerId).GetRealName()}\n");
@@ -106,12 +127,14 @@ internal class Socialite : RoleBase
     public override bool CheckVote(PlayerControl voter, PlayerControl target)
     {
         if (voter == null || target == null) return true;
-        if (GuestList.Contains(voter.PlayerId))
+        if (IsGuest(target.PlayerId))
         {
+            Logger.Info($"Guest-list vote canceled: actor={voter.GetRealName()} ({voter.PlayerId}), target={target.GetRealName()} ({target.PlayerId}); target is already a guest", "Socialite");
             SendMessage(GetString("SocialiteAlreadyGuest"), voter.PlayerId, title: CustomRoles.Socialite.ToColoredString().ToUpper());
             return false;
         }
         GuestList.Add(target.PlayerId);
+        Logger.Info($"Guest-list vote used; vote canceled: actor={voter.GetRealName()} ({voter.PlayerId}), target={target.GetRealName()} ({target.PlayerId})", "Socialite");
         SendMessage(string.Format(GetString("SocialiteVoteMsg"), target.GetRealName()), voter.PlayerId, title: CustomRoles.Socialite.ToColoredString().ToUpper());
         return false;
     }
@@ -121,6 +144,7 @@ internal class Socialite : RoleBase
         if (ResetParties.GetBool())
         {
             PartiedPlayers.Clear();
+            if (_Player != null) SendRPC();
         }
     }
 }

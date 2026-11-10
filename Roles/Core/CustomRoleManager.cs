@@ -161,6 +161,15 @@ public static class CustomRoleManager
     {
         if (killer == target) return true;
 
+        var affectedTarget = DollMaster.SwapPlayerInfo(target);
+        // Party protection must run before target add-ons and forced role abilities.
+        if (Socialite.BlocksInteraction(killer, target, "CheckMurder") ||
+            (affectedTarget != target && Socialite.BlocksInteraction(killer, affectedTarget, "CheckMurder")))
+        {
+            __state = true;
+            return false;
+        }
+
         if (target != null && target.Is(CustomRoles.Fragile))
         {
             if (Fragile.KillFragile(killer, target))
@@ -176,7 +185,7 @@ public static class CustomRoleManager
         var killerSubRoles = killer.GetCustomSubRoles();
 
         // If Target is possessed by Dollmaster swap controllers.
-        target = DollMaster.SwapPlayerInfo(target);
+        target = affectedTarget;
 
         Logger.Info("Start", "PlagueBearer.CheckAndInfect");
 
