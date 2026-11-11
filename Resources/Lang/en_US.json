@@ -1514,6 +1514,7 @@
   "ApplyBanList": "Apply BanList",
   "RemovePetsAtDeadPlayers": "Remove pets at dead players",
   "KillFlashDuration": "Kill-Flash Duration",
+  "UniqueNeutralRevealScreen": "Each <color=#7f8c8d>Neutral</color> Role Has Its Own Reveal Screen",
   "ConfirmEjectionsMode": "Confirm Ejections Mode",
   "ConfirmEjections.None": "None",
   "ConfirmEjections.Team": "Team",
