@@ -88,7 +88,7 @@ internal class Baker : RoleBase
     public static byte CurrentBread() => BreadID;
     private static void SendRPC(byte typeId, PlayerControl player, PlayerControl target)
     {
-        if (!player.IsNonHostModdedClient()) return;
+        //if (!player.IsNonHostModdedClient()) return;
         MessageWriter writer = CustomRpcTransport.Start(CustomRPC.SyncRoleSkill, SendOption.Reliable);
         writer.WriteNetObject(player);
         writer.Write(typeId);
@@ -310,6 +310,7 @@ internal class Baker : RoleBase
         if (TransformNoMoreBread.GetBool() && BreadedPlayerCount(player.PlayerId).Item1 < Main.AllAlivePlayerControls.Where(x => !x.IsNeutralApocalypse()).Count()) return;
 
         player.RpcSetCustomRole(CustomRoles.Famine);
+        player.RpcChangeRoleBasis(CustomRoles.Famine);
         player.GetRoleClass()?.OnAdd(_Player.PlayerId);
 
         player.Notify(GetString("BakerToFamine"));
